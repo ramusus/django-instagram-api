@@ -6,10 +6,10 @@ from instagram.client import InstagramAPI
 from oauth_tokens.api import ApiAbstractBase, Singleton
 
 
-__all__ = ['api_call', ]
+__all__ = ['api', ]
 
-TWITTER_CLIENT_ID = getattr(settings, 'OAUTH_TOKENS_TWITTER_CLIENT_ID', None)
-TWITTER_CLIENT_SECRET = getattr(settings, 'OAUTH_TOKENS_TWITTER_CLIENT_SECRET', None)
+INSTAGRAM_CLIENT_ID = getattr(settings, 'OAUTH_TOKENS_INSTAGRAM_CLIENT_ID', None)
+INSTAGRAM_CLIENT_SECRET = getattr(settings, 'OAUTH_TOKENS_INSTAGRAM_CLIENT_SECRET', None)
 
 
 class InstagrammApi(ApiAbstractBase):
@@ -77,6 +77,7 @@ class InstagrammApi(ApiAbstractBase):
 #         return self.repeat_call(*args, **kwargs)
 
 
-def api_call(*args, **kwargs):
-    api = InstagrammApi()
-    return api.call(*args, **kwargs)
+def api(*args, **kwargs):
+    api = InstagramAPI(client_id=INSTAGRAM_CLIENT_ID, client_secret=INSTAGRAM_CLIENT_SECRET)
+    #return api.call(*args, **kwargs)
+    return api
