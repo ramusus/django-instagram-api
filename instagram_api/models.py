@@ -15,19 +15,19 @@ from .decorators import fetch_all
 from .parser import get_replies
 
 
-__all__ = ['User', 'Status', 'InstagrammContentError', 'InstagrammModel', 'InstagrammManager', 'UserManager']
+__all__ = ['User', 'Status', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 
-log = logging.getLogger('instagramm_api')
+log = logging.getLogger('instagram_api')
 
 
-class InstagrammContentError(Exception):
+class InstagramContentError(Exception):
     pass
 
 
-class InstagrammManager(models.Manager):
+class InstagramManager(models.Manager):
 
     '''
-    Instagramm Manager for RESTful CRUD operations
+    Instagram Manager for RESTful CRUD operations
     '''
 
     def __init__(self, methods=None, remote_pk=None, *args, **kwargs):
@@ -39,15 +39,15 @@ class InstagrammManager(models.Manager):
         if not isinstance(self.remote_pk, tuple):
             self.remote_pk = (self.remote_pk,)
 
-        super(InstagrammManager, self).__init__(*args, **kwargs)
+        super(InstagramManager, self).__init__(*args, **kwargs)
 
     def get_by_url(self, url):
         '''
         Return object by url
         '''
-        m = re.findall(r'(?:https?://)?(?:www\.)?instagramm\.com/([^/]+)/?', url)
+        m = re.findall(r'(?:https?://)?(?:www\.)?instagram\.com/([^/]+)/?', url)
         if not len(m):
-            raise ValueError("Url should be started with https://instagramm.com/")
+            raise ValueError("Url should be started with https://instagram.com/")
 
         return self.get_by_slug(m[0])
 
@@ -115,7 +115,7 @@ class InstagrammManager(models.Manager):
         elif isinstance(response, tweepy.models.Model):
             return self.parse_response_object(response, extra_fields)
         else:
-            raise InstagrammContentError('Instagramm response should be list or dict, not %s' % response)
+            raise InstagramContentError('Instagram response should be list or dict, not %s' % response)
 
     def parse_response_object(self, resource, extra_fields=None):
 
@@ -143,10 +143,10 @@ class InstagrammManager(models.Manager):
         return instances
 
 
-class UserManager(InstagrammManager):
+class UserManager(InstagramManager):
 
     def get_followers_ids_for_user(self, user, all=False, count=5000, **kwargs):
-        # https://dev.instagramm.com/docs/api/1.1/get/followers/ids
+        # https://dev.instagram.com/docs/api/1.1/get/followers/ids
         if all:
             cursor = tweepy.Cursor(user.tweepy._api.followers_ids, id=user.pk, count=count)
             return list(cursor.items())
@@ -154,7 +154,7 @@ class UserManager(InstagrammManager):
             raise NotImplementedError("This method implemented only with argument all=True")
 
     def fetch_followers_for_user(self, user, all=False, count=200, **kwargs):
-        # https://dev.instagramm.com/docs/api/1.1/get/followers/list
+        # https://dev.instagram.com/docs/api/1.1/get/followers/list
         # in docs default count is 20, but maximum is 200
         if all:
             # TODO: make optimization: break cursor iteration after getting already
@@ -178,7 +178,7 @@ class UserManager(InstagrammManager):
                 # perhaps we already have old User with the same screen_name, but different id
                 try:
                     self.fetch(instance_old.pk)
-                except InstagrammError, e:
+                except InstagramError, e:
                     if e.code == 34:
                         instance_old.delete()
                         instance.save()
@@ -191,7 +191,7 @@ class UserManager(InstagrammManager):
 
 
 
-class InstagrammModel(models.Model):
+class InstagramModel(models.Model):
 
     objects = models.Manager()
 
@@ -199,7 +199,7 @@ class InstagrammModel(models.Model):
         abstract = True
 
     def __init__(self, *args, **kwargs):
-        super(InstagrammModel, self).__init__(*args, **kwargs)
+        super(InstagramModel, self).__init__(*args, **kwargs)
 
         # different lists for saving related objects
         self._external_links_post_save = []
@@ -215,7 +215,7 @@ class InstagrammModel(models.Model):
             setattr(self, field, instance)
         self._foreignkeys_pre_save = []
 
-        super(InstagrammModel, self).save(*args, **kwargs)
+        super(InstagramModel, self).save(*args, **kwargs)
 
         for field, instance in self._external_links_post_save:
             # set foreignkey to the main instance
@@ -290,7 +290,7 @@ class InstagrammModel(models.Model):
                 pass
 
 
-class InstagrammBaseModel(InstagrammModel):
+class InstagramBaseModel(InstagramModel):
 
     _tweepy_model = None
     _response = None
@@ -320,13 +320,13 @@ class InstagrammBaseModel(InstagrammModel):
 
     def parse(self):
         self._response.pop('id_str', None)
-        super(InstagrammBaseModel, self).parse()
+        super(InstagramBaseModel, self).parse()
 
     def get_url(self):
-        return 'https://instagramm.com/%s' % self.slug
+        return 'https://instagram.com/%s' % self.slug
 
 
-class User(InstagrammBaseModel):
+class User(InstagramBaseModel):
 
     screen_name = models.CharField(u'Screen name', max_length=50, unique=True)
 
