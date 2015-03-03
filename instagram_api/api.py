@@ -12,11 +12,11 @@ TWITTER_CLIENT_ID = getattr(settings, 'OAUTH_TOKENS_TWITTER_CLIENT_ID', None)
 TWITTER_CLIENT_SECRET = getattr(settings, 'OAUTH_TOKENS_TWITTER_CLIENT_SECRET', None)
 
 
-class InstagramApi(ApiAbstractBase):
+class InstagrammApi(ApiAbstractBase):
 
     __metaclass__ = Singleton
 
-    provider = 'instagram'
+    provider = 'instagramm'
     #error_class = TwitterError
 
     def get_consistent_token(self):
@@ -25,7 +25,7 @@ class InstagramApi(ApiAbstractBase):
     def get_api(self, **kwargs):
         token = self.get_token(**kwargs)
 
-        return api = InstagramAPI(access_token=token)
+        return api = InstagrammAPI(access_token=token)
 
     def get_api_response(self, *args, **kwargs):
         return getattr(self.api, self.method)(*args, **kwargs)
@@ -58,7 +58,7 @@ class InstagramApi(ApiAbstractBase):
             else:
                 return self.repeat_call(*args, **kwargs)
         else:
-            return super(InstagramApi, self).handle_error_no_active_tokens(e, *args, **kwargs)
+            return super(InstagrammApi, self).handle_error_no_active_tokens(e, *args, **kwargs)
 
     def handle_error_code(self, e, *args, **kwargs):
         self.get_error_code(e)
@@ -78,5 +78,5 @@ class InstagramApi(ApiAbstractBase):
 
 
 def api_call(*args, **kwargs):
-    api = InstagramApi()
+    api = InstagrammApi()
     return api.call(*args, **kwargs)
