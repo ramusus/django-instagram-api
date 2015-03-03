@@ -199,38 +199,6 @@ class InstagramModel(models.Model):
     class Meta:
         abstract = True
 
-    def __init__(self, *args, **kwargs):
-        super(InstagramModel, self).__init__(*args, **kwargs)
-
-        # different lists for saving related objects
-        self._external_links_post_save = []
-        self._foreignkeys_pre_save = []
-        self._external_links_to_add = []
-
-    def save(self, *args, **kwargs):
-        '''
-        Save all related instances before or after current instance
-        '''
-        for field, instance in self._foreignkeys_pre_save:
-            instance = instance.__class__.remote.get_or_create_from_instance(instance)
-            setattr(self, field, instance)
-        self._foreignkeys_pre_save = []
-
-        super(InstagramModel, self).save(*args, **kwargs)
-
-        for field, instance in self._external_links_post_save:
-            # set foreignkey to the main instance
-            setattr(instance, field, self)
-            instance.__class__.remote.get_or_create_from_instance(instance)
-        self._external_links_post_save = []
-
-        for field, instance in self._external_links_to_add:
-            # if there is already connected instances, then continue, because it's hard to check for duplicates
-            if getattr(self, field).count():
-                continue
-            getattr(self, field).add(instance)
-        self._external_links_to_add = []
-
     def _substitute(self, old_instance):
         '''
         Substitute new user with old one while updating in method Manager.get_or_create_from_instance()
@@ -275,20 +243,6 @@ class InstagramModel(models.Model):
 
                 setattr(self, key, value)
 
-    def _get_foreignkeys_for_fields(self, *args):
-
-        for field_name in args:
-            model = self._meta.get_field(field_name).rel.to
-            try:
-                id = int(self._response.pop(field_name + '_id', None))
-                setattr(self, field_name, model.objects.get(pk=id))
-            except model.DoesNotExist:
-                try:
-                    self._foreignkeys_pre_save += [(field_name, model.remote.get(id))]
-                except tweepy.TweepError:
-                    pass
-            except TypeError:
-                pass
 
 
 class InstagramBaseModel(InstagramModel):
