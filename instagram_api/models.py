@@ -329,63 +329,29 @@ class InstagramBaseModel(InstagramModel):
 
 class User(InstagramBaseModel):
 
-    screen_name = models.CharField(u'Screen name', max_length=50, unique=True)
+    username = models.CharField(max_length=50, unique=True)
+    full_name = models.CharField(max_length=255)
+    bio = models.CharField("BIO", max_length=255)
 
-    name = models.CharField(u'Name', max_length=100)
-    description = models.TextField(u'Description')
-    location = models.CharField(u'Location', max_length=100)
-    time_zone = models.CharField(u'Time zone', max_length=100, null=True)
+    profile_picture = models.URLField(max_length=300)
+    website = models.URLField(max_length=300)
 
-    contributors_enabled = models.BooleanField(u'Contributors enabled', default=False)
-    default_profile = models.BooleanField(u'Default profile', default=False)
-    default_profile_image = models.BooleanField(u'Default profile image', default=False)
-    follow_request_sent = models.BooleanField(u'Follow request sent', default=False)
-    following = models.BooleanField(u'Following', default=False)
-    geo_enabled = models.BooleanField(u'Geo enabled', default=False)
-    is_translator = models.BooleanField(u'Is translator', default=False)
-    notifications = models.BooleanField(u'Notifications', default=False)
-    profile_use_background_image = models.BooleanField(u'Profile use background image', default=False)
-    protected = models.BooleanField(u'Protected', default=False)
-    verified = models.BooleanField(u'Verified', default=False)
-
-    profile_background_image_url = models.URLField(max_length=300)
-    profile_background_image_url_https = models.URLField(max_length=300)
-    profile_background_tile = models.BooleanField(default=False)
-    profile_background_color = models.CharField(max_length=6)
-    profile_banner_url = models.URLField(max_length=300)
-    profile_image_url = models.URLField(max_length=300)
-    profile_image_url_https = models.URLField(max_length=300)
-    url = models.URLField(max_length=300, null=True)
-
-    profile_link_color = models.CharField(max_length=6)
-    profile_sidebar_border_color = models.CharField(max_length=6)
-    profile_sidebar_fill_color = models.CharField(max_length=6)
-    profile_text_color = models.CharField(max_length=6)
-
-    favorites_count = models.PositiveIntegerField()
     followers_count = models.PositiveIntegerField()
-    friends_count = models.PositiveIntegerField()
-    listed_count = models.PositiveIntegerField()
-    statuses_count = models.PositiveIntegerField()
-    utc_offset = models.IntegerField(null=True)
+    media_count = models.PositiveIntegerField()
 
-    followers = ManyToManyHistoryField('User', versions=True)
+    #followers = ManyToManyHistoryField('User', versions=True)
 
     objects = models.Manager()
     remote = UserManager(methods={
-        'get': 'get_user',
+        'get': 'user',
     })
 
     def __unicode__(self):
-        return self.name
-
-    @property
-    def slug(self):
-        return self.screen_name
+        return self.username
 
     def parse(self):
-        self._response['favorites_count'] = self._response.pop('favourites_count', None)
-        self._response.pop('status', None)
+        #self._response['favorites_count'] = self._response.pop('favourites_count', None)
+        #self._response.pop('status', None)
         super(User, self).parse()
 
     def fetch_followers(self, **kwargs):
