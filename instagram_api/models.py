@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
-import logging
-import re
-
-import tweepy
 from django.db import models
 from django.db.models.fields import FieldDoesNotExist
 from django.db.models.related import RelatedObject
 from django.utils import timezone
 from django.utils.translation import ugettext as _
+import logging
+import re
+
 from m2m_history.fields import ManyToManyHistoryField
 
 from . import fields
-from .api import TwitterError, api_call
+from .api import api_call
 from .decorators import fetch_all
 from .parser import get_replies
+
 
 __all__ = ['User', 'Status', 'TwitterContentError', 'TwitterModel', 'TwitterManager', 'UserManager']
 
