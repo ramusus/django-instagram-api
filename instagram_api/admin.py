@@ -3,7 +3,7 @@ from django.contrib import admin
 from models import User
 
 
-class TwitterModelAdmin(admin.ModelAdmin):
+class AllFieldsReadOnly(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
@@ -11,7 +11,10 @@ class TwitterModelAdmin(admin.ModelAdmin):
         return []
 
 
-class UserAdmin(TwitterModelAdmin):
+class UserAdmin(AllFieldsReadOnly):
+    list_display = ['username', 'full_name', 'created_at']
+    search_fields = ('username', 'full_name')
+
     exclude = ('followers',)
 
 admin.site.register(User, UserAdmin)

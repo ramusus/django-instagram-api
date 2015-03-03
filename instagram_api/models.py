@@ -7,13 +7,16 @@ from django.utils.translation import ugettext as _
 import logging
 import re
 
+from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
 
-#from . import fields
+from . import fields
 from .api import get_api
 from .decorators import fetch_all
-#from .parser import get_replies
 
+
+#from . import fields
+#from .parser import get_replies
 api = get_api()
 
 __all__ = ['User', 'Status', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
@@ -85,7 +88,7 @@ class InstagramManager(models.Manager):
     def api_call(self, method, *args, **kwargs):
         if method in self.methods:
             method = self.methods[method]
-        return api_call(method, *args, **kwargs)
+        return getattr(api, method)(*args, **kwargs)
 
     def fetch(self, *args, **kwargs):
         '''
@@ -113,7 +116,7 @@ class InstagramManager(models.Manager):
         # el
         if isinstance(response, (list, tuple)):
             return self.parse_response_list(response, extra_fields)
-        elif isinstance(response, tweepy.models.Model):
+        elif isinstance(response, ApiModel):
             return self.parse_response_object(response, extra_fields)
         else:
             raise InstagramContentError('Instagram response should be list or dict, not %s' % response)
@@ -134,7 +137,7 @@ class InstagramManager(models.Manager):
         instances = []
         for response in response_list:
 
-            if not isinstance(response, tweepy.models.Model):
+            if not isinstance(response, ApiModel):
                 log.error("Resource %s is not dictionary" % response)
                 continue
 
@@ -170,7 +173,7 @@ class UserManager(InstagramManager):
             raise NotImplementedError("This method implemented only with argument all=True")
         return user.followers.all()
 
-    def get_or_create_from_instance(self, instance):
+    def _______get_or_create_from_instance(self, instance):
         try:
             instance_old = self.model.objects.get(screen_name=instance.screen_name)
             if instance_old.pk == instance.pk:
@@ -251,11 +254,10 @@ class InstagramBaseModel(InstagramModel):
     _response = None
 
     id = models.BigIntegerField(primary_key=True)
-    created_at = models.DateTimeField()
-    lang = models.CharField(max_length=10)
-    #entities = fields.JSONField()
-
+    created_at = models.DateTimeField(auto_now_add=True)
     fetched = models.DateTimeField(u'Fetched', null=True, blank=True)
+    #lang = models.CharField(max_length=10)
+    #entities = fields.JSONField()
 
     class Meta:
         abstract = True
@@ -273,10 +275,6 @@ class InstagramBaseModel(InstagramModel):
             self.parse()
         return self._tweepy_model
 
-    def parse(self):
-        self._response.pop('id_str', None)
-        super(InstagramBaseModel, self).parse()
-
     def get_url(self):
         return 'https://instagram.com/%s' % self.slug
 
@@ -290,8 +288,8 @@ class User(InstagramBaseModel):
     profile_picture = models.URLField(max_length=300)
     website = models.URLField(max_length=300)
 
-    followers_count = models.PositiveIntegerField()
-    media_count = models.PositiveIntegerField()
+    followers_count = models.PositiveIntegerField(null=True)
+    media_count = models.PositiveIntegerField(null=True)
 
     #followers = ManyToManyHistoryField('User', versions=True)
 
