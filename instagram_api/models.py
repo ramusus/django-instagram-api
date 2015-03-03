@@ -10,10 +10,11 @@ import re
 from m2m_history.fields import ManyToManyHistoryField
 
 #from . import fields
-from .api import api
+from .api import get_api
 from .decorators import fetch_all
 #from .parser import get_replies
 
+api = get_api()
 
 __all__ = ['User', 'Status', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 

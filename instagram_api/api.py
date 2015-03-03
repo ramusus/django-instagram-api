@@ -6,7 +6,7 @@ from instagram.client import InstagramAPI
 from oauth_tokens.api import ApiAbstractBase, Singleton
 
 
-__all__ = ['api', ]
+__all__ = ['get_api', ]
 
 INSTAGRAM_CLIENT_ID = getattr(settings, 'OAUTH_TOKENS_INSTAGRAM_CLIENT_ID', None)
 INSTAGRAM_CLIENT_SECRET = getattr(settings, 'OAUTH_TOKENS_INSTAGRAM_CLIENT_SECRET', None)
@@ -25,7 +25,7 @@ class InstagramApi(ApiAbstractBase):
     def get_api(self, **kwargs):
         token = self.get_token(**kwargs)
 
-        return api = InstagramAPI(access_token=token)
+        return InstagramAPI(access_token=token)
 
     def get_api_response(self, *args, **kwargs):
         return getattr(self.api, self.method)(*args, **kwargs)
@@ -77,7 +77,7 @@ class InstagramApi(ApiAbstractBase):
 #         return self.repeat_call(*args, **kwargs)
 
 
-def api(*args, **kwargs):
+def get_api(*args, **kwargs):
     api = InstagramAPI(client_id=INSTAGRAM_CLIENT_ID, client_secret=INSTAGRAM_CLIENT_SECRET)
     #return api.call(*args, **kwargs)
     return api
