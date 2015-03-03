@@ -1,23 +1,23 @@
 from datetime import datetime
-
 from django.conf import settings
-from oauth_tokens.api import ApiAbstractBase, Singleton
 from oauth_tokens.models import AccessToken
-from tweepy import TweepError as TwitterError
-import tweepy
 
-__all__ = ['api_call', 'TwitterError']
+from instagram.client import InstagramAPI
+from oauth_tokens.api import ApiAbstractBase, Singleton
+
+
+__all__ = ['api_call', ]
 
 TWITTER_CLIENT_ID = getattr(settings, 'OAUTH_TOKENS_TWITTER_CLIENT_ID', None)
 TWITTER_CLIENT_SECRET = getattr(settings, 'OAUTH_TOKENS_TWITTER_CLIENT_SECRET', None)
 
 
-class TwitterApi(ApiAbstractBase):
+class InstagramApi(ApiAbstractBase):
 
     __metaclass__ = Singleton
 
-    provider = 'twitter'
-    error_class = TwitterError
+    provider = 'instagram'
+    #error_class = TwitterError
 
     def get_consistent_token(self):
         return getattr(settings, 'TWITTER_API_ACCESS_TOKEN', None)
@@ -25,11 +25,7 @@ class TwitterApi(ApiAbstractBase):
     def get_api(self, **kwargs):
         token = self.get_token(**kwargs)
 
-        delimeter = AccessToken.objects.get_token_class(self.provider).delimeter
-        auth = tweepy.OAuthHandler(TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET)
-        auth.set_access_token(*token.split(delimeter))
-
-        return tweepy.API(auth, wait_on_rate_limit=True, retry_count=3, retry_delay=1, retry_errors=set([401, 404, 500, 503]))
+        return api = InstagramAPI(access_token=token)
 
     def get_api_response(self, *args, **kwargs):
         return getattr(self.api, self.method)(*args, **kwargs)
@@ -62,7 +58,7 @@ class TwitterApi(ApiAbstractBase):
             else:
                 return self.repeat_call(*args, **kwargs)
         else:
-            return super(TwitterApi, self).handle_error_no_active_tokens(e, *args, **kwargs)
+            return super(InstagramApi, self).handle_error_no_active_tokens(e, *args, **kwargs)
 
     def handle_error_code(self, e, *args, **kwargs):
         self.get_error_code(e)
@@ -82,5 +78,5 @@ class TwitterApi(ApiAbstractBase):
 
 
 def api_call(*args, **kwargs):
-    api = TwitterApi()
+    api = InstagramApi()
     return api.call(*args, **kwargs)
