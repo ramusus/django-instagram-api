@@ -15,19 +15,19 @@ from .decorators import fetch_all
 from .parser import get_replies
 
 
-__all__ = ['User', 'Status', 'TwitterContentError', 'TwitterModel', 'TwitterManager', 'UserManager']
+__all__ = ['User', 'Status', 'InstagrammContentError', 'InstagrammModel', 'InstagrammManager', 'UserManager']
 
-log = logging.getLogger('twitter_api')
+log = logging.getLogger('instagramm_api')
 
 
-class TwitterContentError(Exception):
+class InstagrammContentError(Exception):
     pass
 
 
-class TwitterManager(models.Manager):
+class InstagrammManager(models.Manager):
 
     '''
-    Twitter Manager for RESTful CRUD operations
+    Instagramm Manager for RESTful CRUD operations
     '''
 
     def __init__(self, methods=None, remote_pk=None, *args, **kwargs):
@@ -39,15 +39,15 @@ class TwitterManager(models.Manager):
         if not isinstance(self.remote_pk, tuple):
             self.remote_pk = (self.remote_pk,)
 
-        super(TwitterManager, self).__init__(*args, **kwargs)
+        super(InstagrammManager, self).__init__(*args, **kwargs)
 
     def get_by_url(self, url):
         '''
         Return object by url
         '''
-        m = re.findall(r'(?:https?://)?(?:www\.)?twitter\.com/([^/]+)/?', url)
+        m = re.findall(r'(?:https?://)?(?:www\.)?instagramm\.com/([^/]+)/?', url)
         if not len(m):
-            raise ValueError("Url should be started with https://twitter.com/")
+            raise ValueError("Url should be started with https://instagramm.com/")
 
         return self.get_by_slug(m[0])
 
@@ -115,7 +115,7 @@ class TwitterManager(models.Manager):
         elif isinstance(response, tweepy.models.Model):
             return self.parse_response_object(response, extra_fields)
         else:
-            raise TwitterContentError('Twitter response should be list or dict, not %s' % response)
+            raise InstagrammContentError('Instagramm response should be list or dict, not %s' % response)
 
     def parse_response_object(self, resource, extra_fields=None):
 
@@ -143,10 +143,10 @@ class TwitterManager(models.Manager):
         return instances
 
 
-class UserManager(TwitterManager):
+class UserManager(InstagrammManager):
 
     def get_followers_ids_for_user(self, user, all=False, count=5000, **kwargs):
-        # https://dev.twitter.com/docs/api/1.1/get/followers/ids
+        # https://dev.instagramm.com/docs/api/1.1/get/followers/ids
         if all:
             cursor = tweepy.Cursor(user.tweepy._api.followers_ids, id=user.pk, count=count)
             return list(cursor.items())
@@ -154,7 +154,7 @@ class UserManager(TwitterManager):
             raise NotImplementedError("This method implemented only with argument all=True")
 
     def fetch_followers_for_user(self, user, all=False, count=200, **kwargs):
-        # https://dev.twitter.com/docs/api/1.1/get/followers/list
+        # https://dev.instagramm.com/docs/api/1.1/get/followers/list
         # in docs default count is 20, but maximum is 200
         if all:
             # TODO: make optimization: break cursor iteration after getting already
@@ -178,7 +178,7 @@ class UserManager(TwitterManager):
                 # perhaps we already have old User with the same screen_name, but different id
                 try:
                     self.fetch(instance_old.pk)
-                except TwitterError, e:
+                except InstagrammError, e:
                     if e.code == 34:
                         instance_old.delete()
                         instance.save()
@@ -189,18 +189,18 @@ class UserManager(TwitterManager):
             return super(UserManager, self).get_or_create_from_instance(instance)
 
 
-class StatusManager(TwitterManager):
+class StatusManager(InstagrammManager):
 
     @fetch_all(max_count=200)
     def fetch_for_user(self, user, count=20, **kwargs):
-        # https://dev.twitter.com/docs/api/1.1/get/statuses/user_timeline
+        # https://dev.instagramm.com/docs/api/1.1/get/statuses/user_timeline
         response = self.api_call('user_timeline', id=user.pk, count=count, **kwargs)
         instances = self.parse_response(response, {'user_id': user.pk})
         ids = [self.get_or_create_from_instance(instance).pk for instance in instances]
         return self.filter(pk__in=ids)
 
     def fetch_retweets(self, status, count=100, **kwargs):
-        # https://dev.twitter.com/docs/api/1.1/get/statuses/retweets/%3Aid
+        # https://dev.instagramm.com/docs/api/1.1/get/statuses/retweets/%3Aid
         response = self.api_call('retweets', id=status.pk, count=count, **kwargs)
         instances = self.parse_response(response)
         ids = [self.get_or_create_from_instance(instance).pk for instance in instances]
@@ -220,7 +220,7 @@ class StatusManager(TwitterManager):
         return instances
 
 
-class TwitterModel(models.Model):
+class InstagrammModel(models.Model):
 
     objects = models.Manager()
 
@@ -228,7 +228,7 @@ class TwitterModel(models.Model):
         abstract = True
 
     def __init__(self, *args, **kwargs):
-        super(TwitterModel, self).__init__(*args, **kwargs)
+        super(InstagrammModel, self).__init__(*args, **kwargs)
 
         # different lists for saving related objects
         self._external_links_post_save = []
@@ -244,7 +244,7 @@ class TwitterModel(models.Model):
             setattr(self, field, instance)
         self._foreignkeys_pre_save = []
 
-        super(TwitterModel, self).save(*args, **kwargs)
+        super(InstagrammModel, self).save(*args, **kwargs)
 
         for field, instance in self._external_links_post_save:
             # set foreignkey to the main instance
@@ -319,7 +319,7 @@ class TwitterModel(models.Model):
                 pass
 
 
-class TwitterBaseModel(TwitterModel):
+class InstagrammBaseModel(InstagrammModel):
 
     _tweepy_model = None
     _response = None
@@ -349,13 +349,13 @@ class TwitterBaseModel(TwitterModel):
 
     def parse(self):
         self._response.pop('id_str', None)
-        super(TwitterBaseModel, self).parse()
+        super(InstagrammBaseModel, self).parse()
 
     def get_url(self):
-        return 'https://twitter.com/%s' % self.slug
+        return 'https://instagramm.com/%s' % self.slug
 
 
-class User(TwitterBaseModel):
+class User(InstagrammBaseModel):
 
     screen_name = models.CharField(u'Screen name', max_length=50, unique=True)
 
@@ -426,7 +426,7 @@ class User(TwitterBaseModel):
         return Status.remote.fetch_for_user(user=self, **kwargs)
 
 
-class Status(TwitterBaseModel):
+class Status(InstagrammBaseModel):
 
     author = models.ForeignKey('User', related_name='statuses')
 
