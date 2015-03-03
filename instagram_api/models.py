@@ -9,10 +9,10 @@ import re
 
 from m2m_history.fields import ManyToManyHistoryField
 
-from . import fields
-from .api import api_call
+#from . import fields
+from .api import api
 from .decorators import fetch_all
-from .parser import get_replies
+#from .parser import get_replies
 
 
 __all__ = ['User', 'Status', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
@@ -298,7 +298,7 @@ class InstagramBaseModel(InstagramModel):
     id = models.BigIntegerField(primary_key=True)
     created_at = models.DateTimeField()
     lang = models.CharField(max_length=10)
-    entities = fields.JSONField()
+    #entities = fields.JSONField()
 
     fetched = models.DateTimeField(u'Fetched', null=True, blank=True)
 

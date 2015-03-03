@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from django.contrib import admin
-from models import Status, User
+from models import User
 
 
 class TwitterModelAdmin(admin.ModelAdmin):
@@ -11,13 +11,7 @@ class TwitterModelAdmin(admin.ModelAdmin):
         return []
 
 
-class StatusAdmin(TwitterModelAdmin):
-    list_display = ['id', 'author', 'text']
-
-
 class UserAdmin(TwitterModelAdmin):
     exclude = ('followers',)
 
-
-admin.site.register(Status, StatusAdmin)
 admin.site.register(User, UserAdmin)
