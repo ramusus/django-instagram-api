@@ -189,35 +189,6 @@ class UserManager(InstagrammManager):
             return super(UserManager, self).get_or_create_from_instance(instance)
 
 
-class StatusManager(InstagrammManager):
-
-    @fetch_all(max_count=200)
-    def fetch_for_user(self, user, count=20, **kwargs):
-        # https://dev.instagramm.com/docs/api/1.1/get/statuses/user_timeline
-        response = self.api_call('user_timeline', id=user.pk, count=count, **kwargs)
-        instances = self.parse_response(response, {'user_id': user.pk})
-        ids = [self.get_or_create_from_instance(instance).pk for instance in instances]
-        return self.filter(pk__in=ids)
-
-    def fetch_retweets(self, status, count=100, **kwargs):
-        # https://dev.instagramm.com/docs/api/1.1/get/statuses/retweets/%3Aid
-        response = self.api_call('retweets', id=status.pk, count=count, **kwargs)
-        instances = self.parse_response(response)
-        ids = [self.get_or_create_from_instance(instance).pk for instance in instances]
-        return self.filter(pk__in=ids)
-
-    def fetch_replies(self, status, **kwargs):
-        instances = Status.objects.none()
-
-        replies_ids = get_replies(status)
-        for id in replies_ids:
-            instance = Status.remote.fetch(id)
-            instances |= Status.objects.filter(pk=instance.pk)
-
-        status.replies_count = instances.count()
-        status.save()
-
-        return instances
 
 
 class InstagrammModel(models.Model):
@@ -426,62 +397,3 @@ class User(InstagrammBaseModel):
         return Status.remote.fetch_for_user(user=self, **kwargs)
 
 
-class Status(InstagrammBaseModel):
-
-    author = models.ForeignKey('User', related_name='statuses')
-
-    text = models.TextField()
-
-    favorited = models.BooleanField(default=False)
-    retweeted = models.BooleanField(default=False)
-    truncated = models.BooleanField(default=False)
-
-    source = models.CharField(max_length=100)
-    source_url = models.URLField(null=True)
-
-    favorites_count = models.PositiveIntegerField()
-    retweets_count = models.PositiveIntegerField()
-    replies_count = models.PositiveIntegerField(null=True)
-
-    in_reply_to_status = models.ForeignKey('Status', null=True, related_name='replies')
-    in_reply_to_user = models.ForeignKey('User', null=True, related_name='replies')
-
-    favorites_users = ManyToManyHistoryField('User', related_name='favorites')
-    retweeted_status = models.ForeignKey('Status', null=True, related_name='retweets')
-
-    place = fields.JSONField(null=True)
-    # format the next fields doesn't clear
-    contributors = fields.JSONField(null=True)
-    coordinates = fields.JSONField(null=True)
-    geo = fields.JSONField(null=True)
-
-    objects = models.Manager()
-    remote = StatusManager(methods={
-        'get': 'get_status',
-    })
-
-    def __unicode__(self):
-        return u'%s: %s' % (self.author, self.text)
-
-    @property
-    def slug(self):
-        return '/%s/status/%d' % (self.author.screen_name, self.pk)
-
-    def parse(self):
-        self._response['favorites_count'] = self._response.pop('favorite_count', 0)
-        self._response['retweets_count'] = self._response.pop('retweet_count', 0)
-
-        self._response.pop('user', None)
-        self._response.pop('in_reply_to_screen_name', None)
-        self._response.pop('in_reply_to_user_id_str', None)
-        self._response.pop('in_reply_to_status_id_str', None)
-
-        self._get_foreignkeys_for_fields('in_reply_to_status', 'in_reply_to_user')
-
-        super(Status, self).parse()
-
-    def fetch_retweets(self, **kwargs):
-        return Status.remote.fetch_retweets(status=self, **kwargs)
-
-    def fetch_replies(self, **kwargs):
-        return Status.remote.fetch_replies(status=self, **kwargs)
