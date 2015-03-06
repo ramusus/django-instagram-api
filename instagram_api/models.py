@@ -317,3 +317,24 @@ class User(InstagramBaseModel):
         return Status.remote.fetch_for_user(user=self, **kwargs)
 
 
+class MediaManager(InstagramManager):
+
+    #def fetch(id):
+    pass
+
+
+class Media(InstagramBaseModel):
+    user = models.ForeignKey(User, related_name="media_feed")
+
+    caption = models.CharField(max_length=255)
+    link = models.URLField(max_length=300)
+
+    #tags =
+    created_time = models.DateTimeField(auto_now_add=True)
+
+    comment_count = models.PositiveIntegerField(null=True)
+    like_count = models.PositiveIntegerField(null=True)
+
+    remote = MediaManager(methods={
+        'get': 'media',
+    })
