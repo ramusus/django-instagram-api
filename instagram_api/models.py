@@ -208,6 +208,7 @@ class InstagramModel(models.Model):
         Can be overrided in child models
         '''
         self.pk = old_instance.pk
+        self.created_at = old_instance.created_at
 
     def parse(self):
         '''
