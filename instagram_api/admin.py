@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from django.contrib import admin
-from models import User, Media
+from models import User, Media, Comment
 
 
 class AllFieldsReadOnly(admin.ModelAdmin):
@@ -21,6 +21,11 @@ class MediaAdmin(AllFieldsReadOnly):
     list_display = ['id', 'user', 'caption', 'created_at']
     search_fields = ('caption',)
 
+class CommentAdmin(AllFieldsReadOnly):
+    list_display = ['id', 'user', 'media', 'text', 'created_at']
+    search_fields = ('text',)
+
 
 admin.site.register(User, UserAdmin)
 admin.site.register(Media, MediaAdmin)
+admin.site.register(Comment, CommentAdmin)
