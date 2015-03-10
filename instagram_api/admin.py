@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from django.contrib import admin
-from models import User
+from models import User, Media
 
 
 class AllFieldsReadOnly(admin.ModelAdmin):
@@ -17,4 +17,10 @@ class UserAdmin(AllFieldsReadOnly):
 
     exclude = ('followers',)
 
+class MediaAdmin(AllFieldsReadOnly):
+    list_display = ['id', 'user', 'caption', 'created_at']
+    search_fields = ('caption',)
+
+
 admin.site.register(User, UserAdmin)
+admin.site.register(Media, MediaAdmin)
