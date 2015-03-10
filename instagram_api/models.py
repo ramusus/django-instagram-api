@@ -47,23 +47,6 @@ class InstagramManager(models.Manager):
 
         super(InstagramManager, self).__init__(*args, **kwargs)
 
-    def get_by_url(self, url):
-        '''
-        Return object by url
-        '''
-        m = re.findall(r'(?:https?://)?(?:www\.)?instagram\.com/([^/]+)/?', url)
-        if not len(m):
-            raise ValueError("Url should be started with https://instagram.com/")
-
-        return self.get_by_slug(m[0])
-
-    def get_by_slug(self, slug):
-        '''
-        Return object by slug
-        '''
-        # TODO: change to self.get method
-        return self.model.remote.fetch(slug)
-
     def get_or_create_from_instance(self, instance):
 
         remote_pk_dict = {}
@@ -309,9 +292,6 @@ class InstagramBaseModel(InstagramModel):
             self.parse()
         return self._tweepy_model
 
-    def get_url(self):
-        return 'https://instagram.com/%s' % self.slug
-
 
 class User(InstagramBaseModel):
 
@@ -346,9 +326,6 @@ class User(InstagramBaseModel):
 
     def get_followers_ids(self, **kwargs):
         return User.remote.get_followers_ids_for_user(user=self, **kwargs)
-
-    def fetch_statuses(self, **kwargs):
-        return Status.remote.fetch_for_user(user=self, **kwargs)
 
 
 class MediaManager(InstagramManager):
