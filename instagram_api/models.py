@@ -142,20 +142,18 @@ class UserManager(InstagramManager):
         else:
             raise NotImplementedError("This method implemented only with argument all=True")
 
-    def fetch_followers_for_user(self, user, all=False, count=200, **kwargs):
-        # https://dev.instagram.com/docs/api/1.1/get/followers/list
-        # in docs default count is 20, but maximum is 200
-        if all:
-            # TODO: make optimization: break cursor iteration after getting already
-            # existing user and switch to ids REST method
-            user.followers.clear()
-            cursor = tweepy.Cursor(user.tweepy._api.followers, id=user.pk, count=count)
-            for instance in cursor.items():
-                instance = self.parse_response_object(instance)
-                instance = self.get_or_create_from_instance(instance)
-                user.followers.add(instance)
-        else:
-            raise NotImplementedError("This method implemented only with argument all=True")
+    def fetch_followers_for_user(self, user, all=False, count=200):
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+
+        #users
+        response, next_ = self.api.user_follows(user.id)
+        result = self.parse_response(response, extra_fields)
+
+        for instance in result:
+            i = self.get_or_create_from_instance(instance)
+            user.followers.add(i)
+
         return user.followers.all()
 
     def _______get_or_create_from_instance(self, instance):
@@ -306,7 +304,7 @@ class User(InstagramBaseModel):
     followers_count = models.PositiveIntegerField(null=True)
     media_count = models.PositiveIntegerField(null=True)
 
-    #followers = ManyToManyHistoryField('User', versions=True)
+    followers = ManyToManyHistoryField('User')
 
     objects = models.Manager()
     remote = UserManager(methods={
@@ -322,7 +320,7 @@ class User(InstagramBaseModel):
         super(User, self).parse()
 
     def fetch_followers(self, **kwargs):
-        return User.remote.fetch_followers_for_user(user=self, **kwargs)
+        return User.remote.fetch_followers_for_user(self, **kwargs)
 
     def get_followers_ids(self, **kwargs):
         return User.remote.get_followers_ids_for_user(user=self, **kwargs)
