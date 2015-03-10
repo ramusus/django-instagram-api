@@ -275,7 +275,6 @@ class InstagramBaseModel(InstagramModel):
     _tweepy_model = None
     _response = None
 
-    #id = models.BigIntegerField(primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True)
     fetched = models.DateTimeField(u'Fetched', null=True, blank=True)
     #lang = models.CharField(max_length=10)
@@ -303,6 +302,7 @@ class InstagramBaseModel(InstagramModel):
 
 class User(InstagramBaseModel):
 
+    id = models.BigIntegerField(primary_key=True)
     username = models.CharField(max_length=50, unique=True)
     full_name = models.CharField(max_length=255)
     bio = models.CharField("BIO", max_length=255)
