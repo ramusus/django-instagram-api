@@ -19,7 +19,7 @@ from .decorators import fetch_all
 #from .parser import get_replies
 #api = get_api()
 
-__all__ = ['User', 'Status', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
+__all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 
 log = logging.getLogger('instagram_api')
 
@@ -132,57 +132,6 @@ class InstagramManager(models.Manager):
         return instances
 
 
-class UserManager(InstagramManager):
-
-    def fetch_followers_for_user(self, user, all=False, count=200):
-        extra_fields = {}
-        extra_fields['fetched'] = timezone.now()
-
-        #users
-        response, next_ = self.api.user_follows(user.id)
-        result = self.parse_response(response, extra_fields)
-
-        for instance in result:
-            i = self.get_or_create_from_instance(instance)
-            user.followers.add(i)
-
-        return user.followers.all()
-
-    def _______get_or_create_from_instance(self, instance):
-        try:
-            instance_old = self.model.objects.get(screen_name=instance.screen_name)
-            if instance_old.pk == instance.pk:
-                instance.save()
-            else:
-                # perhaps we already have old User with the same screen_name, but different id
-                try:
-                    self.fetch(instance_old.pk)
-                except InstagramError, e:
-                    if e.code == 34:
-                        instance_old.delete()
-                        instance.save()
-                    else:
-                        raise
-            return instance
-        except self.model.DoesNotExist:
-            return super(UserManager, self).get_or_create_from_instance(instance)
-
-
-    def fetch_media_likes(self, media):
-        extra_fields = {}
-        extra_fields['fetched'] = timezone.now()
-
-        #users
-        response = self.api.media_likes(media.id)
-        result = self.parse_response(response, extra_fields)
-
-        for instance in result:
-            i = self.get_or_create_from_instance(instance)
-            media.like_users.add(i)
-
-        return media.like_users.all()
-
-
 class InstagramModel(models.Model):
 
     objects = models.Manager()
@@ -283,6 +232,60 @@ class InstagramBaseModel(InstagramModel):
         return self._tweepy_model
 
 
+
+class UserManager(InstagramManager):
+
+    '''
+    def get_or_create_from_instance(self, instance):
+        try:
+            instance_old = self.model.objects.get(screen_name=instance.screen_name)
+            if instance_old.pk == instance.pk:
+                instance.save()
+            else:
+                # perhaps we already have old User with the same screen_name, but different id
+                try:
+                    self.fetch(instance_old.pk)
+                except InstagramError, e:
+                    if e.code == 34:
+                        instance_old.delete()
+                        instance.save()
+                    else:
+                        raise
+            return instance
+        except self.model.DoesNotExist:
+            return super(UserManager, self).get_or_create_from_instance(instance)
+    '''
+
+
+    def fetch_followers_for_user(self, user, all=False, count=200):
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+
+        #users
+        response, next_ = self.api.user_follows(user.id)
+        result = self.parse_response(response, extra_fields)
+
+        for instance in result:
+            i = self.get_or_create_from_instance(instance)
+            user.followers.add(i)
+
+        return user.followers.all()
+
+    def fetch_media_likes(self, media):
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+
+        #users
+        response = self.api.media_likes(media.id)
+        result = self.parse_response(response, extra_fields)
+
+        for instance in result:
+            i = self.get_or_create_from_instance(instance)
+            media.like_users.add(i)
+
+        return media.like_users.all()
+
+
 class User(InstagramBaseModel):
 
     id = models.BigIntegerField(primary_key=True)
@@ -315,6 +318,7 @@ class User(InstagramBaseModel):
         return User.remote.fetch_followers_for_user(self, **kwargs)
 
 
+
 class MediaManager(InstagramManager):
     pass
 
@@ -345,6 +349,7 @@ class Media(InstagramBaseModel):
         return User.remote.fetch_media_likes(self)
 
 
+
 class CommentManager(InstagramManager):
     def fetch_media_comments(self, media):
 
@@ -356,6 +361,7 @@ class CommentManager(InstagramManager):
         response = self.api.media_comments(media.id)
         result = self.parse_response(response, extra_fields)
         return [self.get_or_create_from_instance(instance) for instance in result]
+
 
 class Comment(InstagramBaseModel):
 
