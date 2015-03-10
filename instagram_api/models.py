@@ -134,14 +134,6 @@ class InstagramManager(models.Manager):
 
 class UserManager(InstagramManager):
 
-    def get_followers_ids_for_user(self, user, all=False, count=5000, **kwargs):
-        # https://dev.instagram.com/docs/api/1.1/get/followers/ids
-        if all:
-            cursor = tweepy.Cursor(user.tweepy._api.followers_ids, id=user.pk, count=count)
-            return list(cursor.items())
-        else:
-            raise NotImplementedError("This method implemented only with argument all=True")
-
     def fetch_followers_for_user(self, user, all=False, count=200):
         extra_fields = {}
         extra_fields['fetched'] = timezone.now()
@@ -321,9 +313,6 @@ class User(InstagramBaseModel):
 
     def fetch_followers(self, **kwargs):
         return User.remote.fetch_followers_for_user(self, **kwargs)
-
-    def get_followers_ids(self, **kwargs):
-        return User.remote.get_followers_ids_for_user(user=self, **kwargs)
 
 
 class MediaManager(InstagramManager):
