@@ -12,13 +12,13 @@ class AllFieldsReadOnly(admin.ModelAdmin):
 
 
 class UserAdmin(AllFieldsReadOnly):
-    list_display = ['username', 'full_name', 'created_at']
+    list_display = ['username', 'full_name']
     search_fields = ('username', 'full_name')
 
     exclude = ('followers',)
 
 class MediaAdmin(AllFieldsReadOnly):
-    list_display = ['id', 'user', 'caption', 'created_at']
+    list_display = ['id', 'user', 'caption', 'created_time']
     search_fields = ('caption',)
 
 class CommentAdmin(AllFieldsReadOnly):

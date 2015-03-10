@@ -218,7 +218,7 @@ class InstagramModel(models.Model):
         Can be overrided in child models
         '''
         self.pk = old_instance.pk
-        self.created_at = old_instance.created_at
+        #self.created_at = old_instance.created_at
 
     def save(self, *args, **kwargs):
         '''
@@ -275,7 +275,7 @@ class InstagramBaseModel(InstagramModel):
     _tweepy_model = None
     _response = None
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    #created_at = models.DateTimeField(auto_now_add=True) # the models have they own field with real created_at time
     fetched = models.DateTimeField(u'Fetched', null=True, blank=True)
     #lang = models.CharField(max_length=10)
     #entities = fields.JSONField()
@@ -383,7 +383,7 @@ class Comment(InstagramBaseModel):
 
     id = models.BigIntegerField(primary_key=True)
     text = models.TextField()
-    #created_at = models.DateTimeField()
+    created_at = models.DateTimeField()
 
     remote = CommentManager()
 
