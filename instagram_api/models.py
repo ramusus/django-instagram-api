@@ -35,6 +35,8 @@ class InstagramManager(models.Manager):
     '''
 
     def __init__(self, methods=None, remote_pk=None, *args, **kwargs):
+        self.api = get_api()
+
         if methods and len(methods.items()) < 1:
             raise ValueError('Argument methods must contains at least 1 specified method')
 
@@ -86,11 +88,9 @@ class InstagramManager(models.Manager):
 #        return self.get_or_create_from_instance(instance)
 
     def api_call(self, method, *args, **kwargs):
-        api = get_api()
-
         if method in self.methods:
             method = self.methods[method]
-        return getattr(api, method)(*args, **kwargs)
+        return getattr(self.api, method)(*args, **kwargs)
 
     def fetch(self, *args, **kwargs):
         '''
@@ -201,10 +201,16 @@ class InstagramModel(models.Model):
 
     objects = models.Manager()
 
-    _foreignkeys_pre_save = []
-
     class Meta:
         abstract = True
+
+    def __init__(self, *args, **kwargs):
+        super(InstagramModel, self).__init__(*args, **kwargs)
+
+        # different lists for saving related objects
+        self._external_links_post_save = []
+        self._foreignkeys_pre_save = []
+        self._external_links_to_add = []
 
     def _substitute(self, old_instance):
         '''
@@ -333,8 +339,6 @@ class User(InstagramBaseModel):
 
 
 class MediaManager(InstagramManager):
-
-    #def fetch(id):
     pass
 
 
@@ -345,7 +349,7 @@ class Media(InstagramBaseModel):
     link = models.URLField(max_length=300)
 
     #tags =
-    created_time = models.DateTimeField(auto_now_add=True)
+    created_time = models.DateTimeField()
 
     comment_count = models.PositiveIntegerField(null=True)
     like_count = models.PositiveIntegerField(null=True)
@@ -355,3 +359,34 @@ class Media(InstagramBaseModel):
     remote = MediaManager(methods={
         'get': 'media',
     })
+
+    def fetch_comments(self):
+        return Comment.remote.fetch_media_comments(self)
+
+
+class CommentManager(InstagramManager):
+    def fetch_media_comments(self, media):
+
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+        extra_fields['media_id'] = media.id
+
+        #comments
+        response = self.api.media_comments(media.id)
+        result = self.parse_response(response, extra_fields)
+        return [self.get_or_create_from_instance(instance) for instance in result]
+
+class Comment(InstagramBaseModel):
+
+    user = models.ForeignKey(User)
+    media = models.ForeignKey(Media, related_name="comments")
+
+    id = models.BigIntegerField(primary_key=True)
+    text = models.TextField()
+    #created_at = models.DateTimeField()
+
+    remote = CommentManager()
+
+
+
+
