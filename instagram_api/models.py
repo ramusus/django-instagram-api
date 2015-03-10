@@ -17,7 +17,7 @@ from .decorators import fetch_all
 
 #from . import fields
 #from .parser import get_replies
-api = get_api()
+#api = get_api()
 
 __all__ = ['User', 'Status', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 
@@ -86,6 +86,8 @@ class InstagramManager(models.Manager):
 #        return self.get_or_create_from_instance(instance)
 
     def api_call(self, method, *args, **kwargs):
+        api = get_api()
+
         if method in self.methods:
             method = self.methods[method]
         return getattr(api, method)(*args, **kwargs)
@@ -199,6 +201,8 @@ class InstagramModel(models.Model):
 
     objects = models.Manager()
 
+    _foreignkeys_pre_save = []
+
     class Meta:
         abstract = True
 
@@ -209,6 +213,17 @@ class InstagramModel(models.Model):
         '''
         self.pk = old_instance.pk
         self.created_at = old_instance.created_at
+
+    def save(self, *args, **kwargs):
+        '''
+        Save all related instances before or after current instance
+        '''
+        for field, instance in self._foreignkeys_pre_save:
+            instance = instance.__class__.remote.get_or_create_from_instance(instance)
+            setattr(self, field, instance)
+        self._foreignkeys_pre_save = []
+
+        super(InstagramModel, self).save(*args, **kwargs)
 
     def parse(self):
         '''
@@ -254,7 +269,7 @@ class InstagramBaseModel(InstagramModel):
     _tweepy_model = None
     _response = None
 
-    id = models.BigIntegerField(primary_key=True)
+    #id = models.BigIntegerField(primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True)
     fetched = models.DateTimeField(u'Fetched', null=True, blank=True)
     #lang = models.CharField(max_length=10)
@@ -324,8 +339,8 @@ class MediaManager(InstagramManager):
 
 
 class Media(InstagramBaseModel):
-    user = models.ForeignKey(User, related_name="media_feed")
 
+    id = models.CharField(max_length=100, primary_key=True)
     caption = models.CharField(max_length=255)
     link = models.URLField(max_length=300)
 
@@ -334,6 +349,8 @@ class Media(InstagramBaseModel):
 
     comment_count = models.PositiveIntegerField(null=True)
     like_count = models.PositiveIntegerField(null=True)
+
+    user = models.ForeignKey(User, related_name="media_feed")
 
     remote = MediaManager(methods={
         'get': 'media',
