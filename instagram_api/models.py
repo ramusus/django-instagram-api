@@ -195,6 +195,19 @@ class UserManager(InstagramManager):
             return super(UserManager, self).get_or_create_from_instance(instance)
 
 
+    def fetch_media_likes(self, media):
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+
+        #users
+        response = self.api.media_likes(media.id)
+        result = self.parse_response(response, extra_fields)
+
+        for instance in result:
+            i = self.get_or_create_from_instance(instance)
+            media.like_users.add(i)
+
+        return media.like_users.all()
 
 
 class InstagramModel(models.Model):
@@ -355,6 +368,7 @@ class Media(InstagramBaseModel):
     like_count = models.PositiveIntegerField(null=True)
 
     user = models.ForeignKey(User, related_name="media_feed")
+    like_users = ManyToManyHistoryField('User', related_name="media_likes")
 
     remote = MediaManager(methods={
         'get': 'media',
@@ -362,6 +376,9 @@ class Media(InstagramBaseModel):
 
     def fetch_comments(self):
         return Comment.remote.fetch_media_comments(self)
+
+    def fetch_likes(self):
+        return User.remote.fetch_media_likes(self)
 
 
 class CommentManager(InstagramManager):
