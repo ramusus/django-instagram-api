@@ -6,6 +6,8 @@ from django.utils import timezone
 from django.utils.translation import ugettext as _
 import logging
 import re
+import requests
+from instagram.helper import timestamp_to_datetime
 
 from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
@@ -63,12 +65,17 @@ class InstagramManager(models.Manager):
 
         return instance
 
-#    def get_or_create_from_resource(self, resource):
-#
-#        instance = self.model()
-#        instance.parse(dict(resource))
-#
-#        return self.get_or_create_from_instance(instance)
+    def get_or_create_from_resource(self, resource, extra_fields):
+
+        resource.update(extra_fields)
+        instance = self.model()
+
+        for k in instance.__dict__:
+            if k in resource:
+                setattr(instance, k, resource[k])
+
+        instance.save()
+        return instance
 
     def api_call(self, method, *args, **kwargs):
         if method in self.methods:
@@ -323,16 +330,38 @@ class User(InstagramBaseModel):
     def fetch_followers(self, **kwargs):
         return User.remote.fetch_followers_for_user(self, **kwargs)
 
+    def fetch_recent_media(self, **kwargs):
+        return Media.remote.fetch_user_recent_media(self, **kwargs)
+
 
 
 class MediaManager(InstagramManager):
-    pass
+    def fetch_user_recent_media(self, user):
+        url = 'https://api.instagram.com/v1/users/%(user_id)s/media/recent/' % {'user_id': user.id}
+
+        r = requests.get(url, params={'client_id': self.api.client_id})
+        #print r.json()
+        j = r.json()
+        pagination = j['pagination']
+        data = j['data']
+
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+        extra_fields['user'] = user
+        extra_fields['user_id'] = user.id
+
+        for d in data:
+            d['created_time'] = timestamp_to_datetime(d['created_time'])
+            d['caption'] = d['caption']['text']
+            i = self.get_or_create_from_resource(d, extra_fields)
+
+        return user.media_feed.all()
 
 
 class Media(InstagramBaseModel):
 
     id = models.CharField(max_length=100, primary_key=True)
-    caption = models.CharField(max_length=255)
+    caption = models.CharField(max_length=500)
     link = models.URLField(max_length=300)
 
     #tags =
