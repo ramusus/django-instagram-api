@@ -26,3 +26,14 @@ class MediaTest(TestCase):
 
         self.assertGreater(m.comment_count, 0)
         self.assertEqual(m.comment_count, len(comments))
+
+    def test_fetch_likes(self):
+        m = Media.remote.fetch(MEDIA_ID)
+
+        likes = m.fetch_likes()
+
+        self.assertGreater(m.like_count, 0)
+        self.assertEqual(m.like_count, len(likes)) # TODO: get all likes
+
+
+
