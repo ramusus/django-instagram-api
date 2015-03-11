@@ -309,6 +309,10 @@ class User(InstagramBaseModel):
     def __unicode__(self):
         return self.username
 
+    @property
+    def instagram_link(self):
+        return u'https://instagram.com/%s/' % self.username
+
     def parse(self):
         if 'counts' in self._response:
             self.followers_count = self._response['counts']['followed_by']

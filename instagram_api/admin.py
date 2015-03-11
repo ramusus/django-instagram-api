@@ -12,7 +12,11 @@ class AllFieldsReadOnly(admin.ModelAdmin):
 
 
 class UserAdmin(AllFieldsReadOnly):
-    list_display = ['username', 'full_name']
+    def instagram_link(self, obj):
+        return u'<a href="%s">%s</a>' % (obj.instagram_link, obj.username)
+    instagram_link.allow_tags = True
+
+    list_display = ['id', 'full_name', 'instagram_link']
     search_fields = ('username', 'full_name')
 
     exclude = ('followers',)
