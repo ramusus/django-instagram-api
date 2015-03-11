@@ -3,9 +3,24 @@ from django.test import TestCase
 from . models import User, Media, Comment
 #from .factories import UserFactory, MediaFactory
 
-
+USER_ID = 237074561 # tnt_online
 MEDIA_ID = '934625295371059186_205828054'
 
+
+
+class UserTest(TestCase):
+
+    def test_fetch_user(self):
+        u = User.remote.fetch(USER_ID)
+
+        self.assertEqual(int(u.id), USER_ID)
+        self.assertEqual(u.username, 'tnt_online')
+        self.assertEqual(u.full_name, u'Телеканал ТНТ')
+
+        self.assertGreater(len(u.profile_picture), 0)
+        self.assertGreater(len(u.website), 0)
+        self.assertGreater(u.followers_count, 0)
+        self.assertGreater(u.media_count, 0)
 
 
 class MediaTest(TestCase):
