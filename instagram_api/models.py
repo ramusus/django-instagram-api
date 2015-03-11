@@ -310,8 +310,10 @@ class User(InstagramBaseModel):
         return self.username
 
     def parse(self):
-        #self._response['favorites_count'] = self._response.pop('favourites_count', None)
-        #self._response.pop('status', None)
+        if 'counts' in self._response:
+            self.followers_count = self._response['counts']['followed_by']
+            self.media_count = self._response['counts']['media']
+
         super(User, self).parse()
 
     def fetch_followers(self, **kwargs):
