@@ -353,6 +353,9 @@ class MediaManager(InstagramManager):
         for d in data:
             d['created_time'] = timestamp_to_datetime(d['created_time'])
             d['caption'] = d['caption']['text']
+            d['comment_count'] = d['comments']['count']
+            d['like_count'] = d['likes']['count']
+
             i = self.get_or_create_from_resource(d, extra_fields)
 
         return user.media_feed.all()
