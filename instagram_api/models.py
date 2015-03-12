@@ -377,6 +377,9 @@ class Media(InstagramBaseModel):
         'get': 'media',
     })
 
+    def __unicode__(self):
+        return self.id
+
     def fetch_comments(self):
         return Comment.remote.fetch_media_comments(self)
 
