@@ -264,19 +264,23 @@ class UserManager(InstagramManager):
     '''
 
 
-    def fetch_followers_for_user(self, user, all=False, count=200):
+    def fetch_followers_for_user(self, user, all=False, count=50):
         extra_fields = {}
         extra_fields['fetched'] = timezone.now()
 
         #users
-        response, next_ = self.api.user_follows(user.id)
+        response, next_ = self.api.user_followed_by(user.id)
+
         result = self.parse_response(response, extra_fields)
 
+        instances = []
         for instance in result:
             i = self.get_or_create_from_instance(instance)
+            instances.append(i)
             user.followers.add(i)
 
-        return user.followers.all()
+        #return user.followers.all()
+        return instances
 
     def fetch_media_likes(self, media):
         extra_fields = {}
