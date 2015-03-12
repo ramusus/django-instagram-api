@@ -340,20 +340,25 @@ class User(InstagramBaseModel):
 
 
 class MediaManager(InstagramManager):
-    def fetch_user_recent_media(self, user):
-        url = 'https://api.instagram.com/v1/users/%(user_id)s/media/recent/' % {'user_id': user.id}
+    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20):
 
-        r = requests.get(url, params={'client_id': self.api.client_id})
-        #print r.json()
+        if next_url:
+            url = next_url
+            r = requests.get(url)
+        else:
+            url = 'https://api.instagram.com/v1/users/%(user_id)s/media/recent/' % {'user_id': user.id}
+            r = requests.get(url, params={'client_id': self.api.client_id}) #
+
         j = r.json()
-        pagination = j['pagination']
-        data = j['data']
+        next_url = j['pagination'].get('next_url', None)
 
         extra_fields = {}
         extra_fields['fetched'] = timezone.now()
         extra_fields['user'] = user
         extra_fields['user_id'] = user.id
 
+        instances = []
+        data = j['data']
         for d in data:
             d['created_time'] = timestamp_to_datetime(d['created_time'])
             d['caption'] = d['caption']['text']
@@ -361,14 +366,22 @@ class MediaManager(InstagramManager):
             d['like_count'] = d['likes']['count']
 
             i = self.get_or_create_from_resource(d, extra_fields)
+            instances.append(i)
 
-        return user.media_feed.all()
+        if all:
+            if next_url:
+                return self.fetch_user_recent_media(user, all=True, next_url=next_url)
+            else:
+                return user.media_feed.all()
+        else:
+            return instances
+
 
 
 class Media(InstagramBaseModel):
 
     id = models.CharField(max_length=100, primary_key=True)
-    caption = models.CharField(max_length=500)
+    caption = models.CharField(max_length=1000)
     link = models.URLField(max_length=300)
 
     #tags =
