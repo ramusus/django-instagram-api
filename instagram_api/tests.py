@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from . models import User, Media, Comment
-#from .factories import UserFactory, MediaFactory
+from .factories import UserFactory, MediaFactory
 
 USER_ID = 237074561 # tnt_online
 MEDIA_ID = '934625295371059186_205828054'
@@ -50,6 +50,23 @@ class MediaTest(TestCase):
         self.assertGreater(m.fetched, self.time)
         self.assertIsInstance(m.created_time, datetime)
 
+    def test_fetch_user_media(self):
+        u = UserFactory(id=USER_ID)
+
+        medias = u.fetch_recent_media()
+        m = medias[0]
+
+        self.assertEqual(m.user, u)
+
+        self.assertGreater(len(m.caption), 0)
+        self.assertGreater(len(m.link), 0)
+
+        self.assertGreater(m.comment_count, 0)
+        self.assertGreater(m.like_count, 0)
+
+        self.assertGreater(m.fetched, self.time)
+        self.assertIsInstance(m.created_time, datetime)
+
     def test_fetch_comments(self):
         m = Media.remote.fetch(MEDIA_ID)
 
@@ -73,6 +90,5 @@ class MediaTest(TestCase):
 
         self.assertGreater(m.like_count, 0)
         self.assertEqual(m.like_count, len(likes)) # TODO: get all likes
-
 
 
