@@ -7,8 +7,8 @@ from django.utils.translation import ugettext as _
 import logging
 import re
 import requests
-from instagram.helper import timestamp_to_datetime
 
+from instagram.helper import timestamp_to_datetime
 from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
 
@@ -20,7 +20,6 @@ from .decorators import fetch_all
 #from . import fields
 #from .parser import get_replies
 #api = get_api()
-
 __all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 
 log = logging.getLogger('instagram_api')
@@ -188,9 +187,10 @@ class InstagramModel(models.Model):
                 continue
 
             if isinstance(field, RelatedObject) and value:
-                for item in value:
-                    rel_instance = field.model.remote.parse_response_object(item)
-                    self._external_links_post_save += [(field.field.name, rel_instance)]
+                #for item in value:
+                #    rel_instance = field.model.remote.parse_response_object(item)
+                #    self._external_links_post_save += [(field.field.name, rel_instance)]
+                pass
             else:
                 if isinstance(field, (models.BooleanField)):
                     value = bool(value)
@@ -379,6 +379,10 @@ class Media(InstagramBaseModel):
 
     def __unicode__(self):
         return self.id
+
+    def parse(self):
+        self._response['caption'] = self._response['caption'].text
+        super(Media, self).parse()
 
     def fetch_comments(self):
         return Comment.remote.fetch_media_comments(self)

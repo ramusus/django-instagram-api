@@ -41,7 +41,7 @@ class MediaTest(TestCase):
         m = Media.remote.fetch(MEDIA_ID)
 
         self.assertEqual(m.id, MEDIA_ID)
-        #self.assertGreater(len(m.caption), 0)
+        self.assertGreater(len(m.caption), 0)
         self.assertGreater(len(m.link), 0)
 
         self.assertGreater(m.comment_count, 0)
