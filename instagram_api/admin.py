@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from django.contrib import admin
-from models import Status, User
+from models import User, Media, Comment
 
 
-class TwitterModelAdmin(admin.ModelAdmin):
+class AllFieldsReadOnly(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
@@ -11,13 +11,25 @@ class TwitterModelAdmin(admin.ModelAdmin):
         return []
 
 
-class StatusAdmin(TwitterModelAdmin):
-    list_display = ['id', 'author', 'text']
+class UserAdmin(AllFieldsReadOnly):
+    def instagram_link(self, obj):
+        return u'<a href="%s">%s</a>' % (obj.instagram_link, obj.username)
+    instagram_link.allow_tags = True
 
+    list_display = ['id', 'full_name', 'instagram_link']
+    search_fields = ('username', 'full_name')
 
-class UserAdmin(TwitterModelAdmin):
     exclude = ('followers',)
 
+class MediaAdmin(AllFieldsReadOnly):
+    list_display = ['id', 'user', 'caption', 'created_time']
+    search_fields = ('caption',)
 
-admin.site.register(Status, StatusAdmin)
+class CommentAdmin(AllFieldsReadOnly):
+    list_display = ['id', 'user', 'media', 'text', 'created_at']
+    search_fields = ('text',)
+
+
 admin.site.register(User, UserAdmin)
+admin.site.register(Media, MediaAdmin)
+admin.site.register(Comment, CommentAdmin)

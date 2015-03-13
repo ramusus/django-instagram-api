@@ -7,8 +7,8 @@ setup(
     version=__import__('instagram_api').__version__,
     description='Django implementation for instagram API',
     long_description=open('README.md').read(),
-    author='ramusus',
-    author_email='ramusus@gmail.com',
+    author='krupin.dv',
+    author_email='krupin.dv19@gmail.com',
     url='https://github.com/ramusus/django-instagram-api',
     download_url='http://pypi.python.org/pypi/django-instagram-api',
     license='BSD',
@@ -16,12 +16,9 @@ setup(
     include_package_data=True,
     zip_safe=False,  # because we're including media that Django needs
     install_requires=[
-        'django',
-        'django-annoying',
-        'django-picklefield',
-        'django-oauth-tokens>=0.4.10',
-        'django-m2m-history>=0.2.0',
-        'tweepy',
+        'requests>=2.5.3',
+        'python-instagram>=1.3.0',
+        'django-m2m-history>=0.2.2',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

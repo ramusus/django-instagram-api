@@ -1,36 +1,43 @@
 # -*- coding: utf-8 -*-
-import logging
-import re
-
-import tweepy
 from django.db import models
 from django.db.models.fields import FieldDoesNotExist
 from django.db.models.related import RelatedObject
 from django.utils import timezone
 from django.utils.translation import ugettext as _
+import logging
+import re
+import requests
+
+from instagram.helper import timestamp_to_datetime
+from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
 
 from . import fields
-from .api import TwitterError, api_call
+from .api import get_api
 from .decorators import fetch_all
-from .parser import get_replies
-
-__all__ = ['User', 'Status', 'TwitterContentError', 'TwitterModel', 'TwitterManager', 'UserManager']
-
-log = logging.getLogger('twitter_api')
 
 
-class TwitterContentError(Exception):
+#from . import fields
+#from .parser import get_replies
+#api = get_api()
+__all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
+
+log = logging.getLogger('instagram_api')
+
+
+class InstagramContentError(Exception):
     pass
 
 
-class TwitterManager(models.Manager):
+class InstagramManager(models.Manager):
 
     '''
-    Twitter Manager for RESTful CRUD operations
+    Instagram Manager for RESTful CRUD operations
     '''
 
     def __init__(self, methods=None, remote_pk=None, *args, **kwargs):
+        self.api = get_api()
+
         if methods and len(methods.items()) < 1:
             raise ValueError('Argument methods must contains at least 1 specified method')
 
@@ -39,24 +46,7 @@ class TwitterManager(models.Manager):
         if not isinstance(self.remote_pk, tuple):
             self.remote_pk = (self.remote_pk,)
 
-        super(TwitterManager, self).__init__(*args, **kwargs)
-
-    def get_by_url(self, url):
-        '''
-        Return object by url
-        '''
-        m = re.findall(r'(?:https?://)?(?:www\.)?twitter\.com/([^/]+)/?', url)
-        if not len(m):
-            raise ValueError("Url should be started with https://twitter.com/")
-
-        return self.get_by_slug(m[0])
-
-    def get_by_slug(self, slug):
-        '''
-        Return object by slug
-        '''
-        # TODO: change to self.get method
-        return self.model.remote.fetch(slug)
+        super(InstagramManager, self).__init__(*args, **kwargs)
 
     def get_or_create_from_instance(self, instance):
 
@@ -74,17 +64,22 @@ class TwitterManager(models.Manager):
 
         return instance
 
-#    def get_or_create_from_resource(self, resource):
-#
-#        instance = self.model()
-#        instance.parse(dict(resource))
-#
-#        return self.get_or_create_from_instance(instance)
+    def get_or_create_from_resource(self, resource, extra_fields):
+
+        resource.update(extra_fields)
+        instance = self.model()
+
+        for k in instance.__dict__:
+            if k in resource:
+                setattr(instance, k, resource[k])
+
+        instance.save()
+        return instance
 
     def api_call(self, method, *args, **kwargs):
         if method in self.methods:
             method = self.methods[method]
-        return api_call(method, *args, **kwargs)
+        return getattr(self.api, method)(*args, **kwargs)
 
     def fetch(self, *args, **kwargs):
         '''
@@ -112,10 +107,10 @@ class TwitterManager(models.Manager):
         # el
         if isinstance(response, (list, tuple)):
             return self.parse_response_list(response, extra_fields)
-        elif isinstance(response, tweepy.models.Model):
+        elif isinstance(response, ApiModel):
             return self.parse_response_object(response, extra_fields)
         else:
-            raise TwitterContentError('Twitter response should be list or dict, not %s' % response)
+            raise InstagramContentError('Instagram response should be list or dict, not %s' % response)
 
     def parse_response_object(self, resource, extra_fields=None):
 
@@ -133,7 +128,7 @@ class TwitterManager(models.Manager):
         instances = []
         for response in response_list:
 
-            if not isinstance(response, tweepy.models.Model):
+            if not isinstance(response, ApiModel):
                 log.error("Resource %s is not dictionary" % response)
                 continue
 
@@ -143,84 +138,7 @@ class TwitterManager(models.Manager):
         return instances
 
 
-class UserManager(TwitterManager):
-
-    def get_followers_ids_for_user(self, user, all=False, count=5000, **kwargs):
-        # https://dev.twitter.com/docs/api/1.1/get/followers/ids
-        if all:
-            cursor = tweepy.Cursor(user.tweepy._api.followers_ids, id=user.pk, count=count)
-            return list(cursor.items())
-        else:
-            raise NotImplementedError("This method implemented only with argument all=True")
-
-    def fetch_followers_for_user(self, user, all=False, count=200, **kwargs):
-        # https://dev.twitter.com/docs/api/1.1/get/followers/list
-        # in docs default count is 20, but maximum is 200
-        if all:
-            # TODO: make optimization: break cursor iteration after getting already
-            # existing user and switch to ids REST method
-            user.followers.clear()
-            cursor = tweepy.Cursor(user.tweepy._api.followers, id=user.pk, count=count)
-            for instance in cursor.items():
-                instance = self.parse_response_object(instance)
-                instance = self.get_or_create_from_instance(instance)
-                user.followers.add(instance)
-        else:
-            raise NotImplementedError("This method implemented only with argument all=True")
-        return user.followers.all()
-
-    def get_or_create_from_instance(self, instance):
-        try:
-            instance_old = self.model.objects.get(screen_name=instance.screen_name)
-            if instance_old.pk == instance.pk:
-                instance.save()
-            else:
-                # perhaps we already have old User with the same screen_name, but different id
-                try:
-                    self.fetch(instance_old.pk)
-                except TwitterError, e:
-                    if e.code == 34:
-                        instance_old.delete()
-                        instance.save()
-                    else:
-                        raise
-            return instance
-        except self.model.DoesNotExist:
-            return super(UserManager, self).get_or_create_from_instance(instance)
-
-
-class StatusManager(TwitterManager):
-
-    @fetch_all(max_count=200)
-    def fetch_for_user(self, user, count=20, **kwargs):
-        # https://dev.twitter.com/docs/api/1.1/get/statuses/user_timeline
-        response = self.api_call('user_timeline', id=user.pk, count=count, **kwargs)
-        instances = self.parse_response(response, {'user_id': user.pk})
-        ids = [self.get_or_create_from_instance(instance).pk for instance in instances]
-        return self.filter(pk__in=ids)
-
-    def fetch_retweets(self, status, count=100, **kwargs):
-        # https://dev.twitter.com/docs/api/1.1/get/statuses/retweets/%3Aid
-        response = self.api_call('retweets', id=status.pk, count=count, **kwargs)
-        instances = self.parse_response(response)
-        ids = [self.get_or_create_from_instance(instance).pk for instance in instances]
-        return self.filter(pk__in=ids)
-
-    def fetch_replies(self, status, **kwargs):
-        instances = Status.objects.none()
-
-        replies_ids = get_replies(status)
-        for id in replies_ids:
-            instance = Status.remote.fetch(id)
-            instances |= Status.objects.filter(pk=instance.pk)
-
-        status.replies_count = instances.count()
-        status.save()
-
-        return instances
-
-
-class TwitterModel(models.Model):
+class InstagramModel(models.Model):
 
     objects = models.Manager()
 
@@ -228,12 +146,20 @@ class TwitterModel(models.Model):
         abstract = True
 
     def __init__(self, *args, **kwargs):
-        super(TwitterModel, self).__init__(*args, **kwargs)
+        super(InstagramModel, self).__init__(*args, **kwargs)
 
         # different lists for saving related objects
         self._external_links_post_save = []
         self._foreignkeys_pre_save = []
         self._external_links_to_add = []
+
+    def _substitute(self, old_instance):
+        '''
+        Substitute new user with old one while updating in method Manager.get_or_create_from_instance()
+        Can be overrided in child models
+        '''
+        self.pk = old_instance.pk
+        #self.created_at = old_instance.created_at
 
     def save(self, *args, **kwargs):
         '''
@@ -244,27 +170,7 @@ class TwitterModel(models.Model):
             setattr(self, field, instance)
         self._foreignkeys_pre_save = []
 
-        super(TwitterModel, self).save(*args, **kwargs)
-
-        for field, instance in self._external_links_post_save:
-            # set foreignkey to the main instance
-            setattr(instance, field, self)
-            instance.__class__.remote.get_or_create_from_instance(instance)
-        self._external_links_post_save = []
-
-        for field, instance in self._external_links_to_add:
-            # if there is already connected instances, then continue, because it's hard to check for duplicates
-            if getattr(self, field).count():
-                continue
-            getattr(self, field).add(instance)
-        self._external_links_to_add = []
-
-    def _substitute(self, old_instance):
-        '''
-        Substitute new user with old one while updating in method Manager.get_or_create_from_instance()
-        Can be overrided in child models
-        '''
-        self.pk = old_instance.pk
+        super(InstagramModel, self).save(*args, **kwargs)
 
     def parse(self):
         '''
@@ -281,9 +187,10 @@ class TwitterModel(models.Model):
                 continue
 
             if isinstance(field, RelatedObject) and value:
-                for item in value:
-                    rel_instance = field.model.remote.parse_response_object(item)
-                    self._external_links_post_save += [(field.field.name, rel_instance)]
+                #for item in value:
+                #    rel_instance = field.model.remote.parse_response_object(item)
+                #    self._external_links_post_save += [(field.field.name, rel_instance)]
+                pass
             else:
                 if isinstance(field, (models.BooleanField)):
                     value = bool(value)
@@ -303,33 +210,17 @@ class TwitterModel(models.Model):
 
                 setattr(self, key, value)
 
-    def _get_foreignkeys_for_fields(self, *args):
-
-        for field_name in args:
-            model = self._meta.get_field(field_name).rel.to
-            try:
-                id = int(self._response.pop(field_name + '_id', None))
-                setattr(self, field_name, model.objects.get(pk=id))
-            except model.DoesNotExist:
-                try:
-                    self._foreignkeys_pre_save += [(field_name, model.remote.get(id))]
-                except tweepy.TweepError:
-                    pass
-            except TypeError:
-                pass
 
 
-class TwitterBaseModel(TwitterModel):
+class InstagramBaseModel(InstagramModel):
 
     _tweepy_model = None
     _response = None
 
-    id = models.BigIntegerField(primary_key=True)
-    created_at = models.DateTimeField()
-    lang = models.CharField(max_length=10)
-    entities = fields.JSONField()
-
+    #created_at = models.DateTimeField(auto_now_add=True) # the models have they own field with real created_at time
     fetched = models.DateTimeField(u'Fetched', null=True, blank=True)
+    #lang = models.CharField(max_length=10)
+    #entities = fields.JSONField()
 
     class Meta:
         abstract = True
@@ -347,141 +238,204 @@ class TwitterBaseModel(TwitterModel):
             self.parse()
         return self._tweepy_model
 
-    def parse(self):
-        self._response.pop('id_str', None)
-        super(TwitterBaseModel, self).parse()
-
-    def get_url(self):
-        return 'https://twitter.com/%s' % self.slug
 
 
-class User(TwitterBaseModel):
+class UserManager(InstagramManager):
 
-    screen_name = models.CharField(u'Screen name', max_length=50, unique=True)
+    '''
+    def get_or_create_from_instance(self, instance):
+        try:
+            instance_old = self.model.objects.get(screen_name=instance.screen_name)
+            if instance_old.pk == instance.pk:
+                instance.save()
+            else:
+                # perhaps we already have old User with the same screen_name, but different id
+                try:
+                    self.fetch(instance_old.pk)
+                except InstagramError, e:
+                    if e.code == 34:
+                        instance_old.delete()
+                        instance.save()
+                    else:
+                        raise
+            return instance
+        except self.model.DoesNotExist:
+            return super(UserManager, self).get_or_create_from_instance(instance)
+    '''
 
-    name = models.CharField(u'Name', max_length=100)
-    description = models.TextField(u'Description')
-    location = models.CharField(u'Location', max_length=100)
-    time_zone = models.CharField(u'Time zone', max_length=100, null=True)
 
-    contributors_enabled = models.BooleanField(u'Contributors enabled', default=False)
-    default_profile = models.BooleanField(u'Default profile', default=False)
-    default_profile_image = models.BooleanField(u'Default profile image', default=False)
-    follow_request_sent = models.BooleanField(u'Follow request sent', default=False)
-    following = models.BooleanField(u'Following', default=False)
-    geo_enabled = models.BooleanField(u'Geo enabled', default=False)
-    is_translator = models.BooleanField(u'Is translator', default=False)
-    notifications = models.BooleanField(u'Notifications', default=False)
-    profile_use_background_image = models.BooleanField(u'Profile use background image', default=False)
-    protected = models.BooleanField(u'Protected', default=False)
-    verified = models.BooleanField(u'Verified', default=False)
+    def fetch_followers_for_user(self, user, all=False, count=50):
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
 
-    profile_background_image_url = models.URLField(max_length=300)
-    profile_background_image_url_https = models.URLField(max_length=300)
-    profile_background_tile = models.BooleanField(default=False)
-    profile_background_color = models.CharField(max_length=6)
-    profile_banner_url = models.URLField(max_length=300)
-    profile_image_url = models.URLField(max_length=300)
-    profile_image_url_https = models.URLField(max_length=300)
-    url = models.URLField(max_length=300, null=True)
+        #users
+        response, next_ = self.api.user_followed_by(user.id)
 
-    profile_link_color = models.CharField(max_length=6)
-    profile_sidebar_border_color = models.CharField(max_length=6)
-    profile_sidebar_fill_color = models.CharField(max_length=6)
-    profile_text_color = models.CharField(max_length=6)
+        result = self.parse_response(response, extra_fields)
 
-    favorites_count = models.PositiveIntegerField()
-    followers_count = models.PositiveIntegerField()
-    friends_count = models.PositiveIntegerField()
-    listed_count = models.PositiveIntegerField()
-    statuses_count = models.PositiveIntegerField()
-    utc_offset = models.IntegerField(null=True)
+        instances = []
+        for instance in result:
+            i = self.get_or_create_from_instance(instance)
+            instances.append(i)
+            user.followers.add(i)
 
-    followers = ManyToManyHistoryField('User', versions=True)
+        #return user.followers.all()
+        return instances
+
+    def fetch_media_likes(self, media):
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+
+        #users
+        response = self.api.media_likes(media.id)
+        result = self.parse_response(response, extra_fields)
+
+        for instance in result:
+            i = self.get_or_create_from_instance(instance)
+            media.like_users.add(i)
+
+        return media.like_users.all()
+
+
+class User(InstagramBaseModel):
+
+    id = models.BigIntegerField(primary_key=True)
+    username = models.CharField(max_length=50, unique=True)
+    full_name = models.CharField(max_length=255)
+    bio = models.CharField("BIO", max_length=255)
+
+    profile_picture = models.URLField(max_length=300)
+    website = models.URLField(max_length=300)
+
+    followers_count = models.PositiveIntegerField(null=True)
+    media_count = models.PositiveIntegerField(null=True)
+
+    followers = ManyToManyHistoryField('User')
 
     objects = models.Manager()
     remote = UserManager(methods={
-        'get': 'get_user',
+        'get': 'user',
     })
 
     def __unicode__(self):
-        return self.name
+        return self.username
 
     @property
-    def slug(self):
-        return self.screen_name
+    def instagram_link(self):
+        return u'https://instagram.com/%s/' % self.username
 
     def parse(self):
-        self._response['favorites_count'] = self._response.pop('favourites_count', None)
-        self._response.pop('status', None)
+        if 'counts' in self._response:
+            self.followers_count = self._response['counts']['followed_by']
+            self.media_count = self._response['counts']['media']
+
         super(User, self).parse()
 
     def fetch_followers(self, **kwargs):
-        return User.remote.fetch_followers_for_user(user=self, **kwargs)
+        return User.remote.fetch_followers_for_user(self, **kwargs)
 
-    def get_followers_ids(self, **kwargs):
-        return User.remote.get_followers_ids_for_user(user=self, **kwargs)
-
-    def fetch_statuses(self, **kwargs):
-        return Status.remote.fetch_for_user(user=self, **kwargs)
+    def fetch_recent_media(self, **kwargs):
+        return Media.remote.fetch_user_recent_media(self, **kwargs)
 
 
-class Status(TwitterBaseModel):
 
-    author = models.ForeignKey('User', related_name='statuses')
+class MediaManager(InstagramManager):
+    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20):
 
-    text = models.TextField()
+        if next_url:
+            url = next_url
+            r = requests.get(url)
+        else:
+            url = 'https://api.instagram.com/v1/users/%(user_id)s/media/recent/' % {'user_id': user.id}
+            r = requests.get(url, params={'client_id': self.api.client_id}) #
 
-    favorited = models.BooleanField(default=False)
-    retweeted = models.BooleanField(default=False)
-    truncated = models.BooleanField(default=False)
+        j = r.json()
+        next_url = j['pagination'].get('next_url', None)
 
-    source = models.CharField(max_length=100)
-    source_url = models.URLField(null=True)
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+        extra_fields['user'] = user
+        extra_fields['user_id'] = user.id
 
-    favorites_count = models.PositiveIntegerField()
-    retweets_count = models.PositiveIntegerField()
-    replies_count = models.PositiveIntegerField(null=True)
+        instances = []
+        data = j['data']
+        for d in data:
+            d['created_time'] = timestamp_to_datetime(d['created_time'])
+            d['caption'] = d['caption']['text']
+            d['comment_count'] = d['comments']['count']
+            d['like_count'] = d['likes']['count']
 
-    in_reply_to_status = models.ForeignKey('Status', null=True, related_name='replies')
-    in_reply_to_user = models.ForeignKey('User', null=True, related_name='replies')
+            i = self.get_or_create_from_resource(d, extra_fields)
+            instances.append(i)
 
-    favorites_users = ManyToManyHistoryField('User', related_name='favorites')
-    retweeted_status = models.ForeignKey('Status', null=True, related_name='retweets')
+        if all:
+            if next_url:
+                return self.fetch_user_recent_media(user, all=True, next_url=next_url)
+            else:
+                return user.media_feed.all()
+        else:
+            return instances
 
-    place = fields.JSONField(null=True)
-    # format the next fields doesn't clear
-    contributors = fields.JSONField(null=True)
-    coordinates = fields.JSONField(null=True)
-    geo = fields.JSONField(null=True)
 
-    objects = models.Manager()
-    remote = StatusManager(methods={
-        'get': 'get_status',
+
+class Media(InstagramBaseModel):
+
+    id = models.CharField(max_length=100, primary_key=True)
+    caption = models.CharField(max_length=1000)
+    link = models.URLField(max_length=300)
+
+    #tags =
+    created_time = models.DateTimeField()
+
+    comment_count = models.PositiveIntegerField(null=True)
+    like_count = models.PositiveIntegerField(null=True)
+
+    user = models.ForeignKey(User, related_name="media_feed")
+    like_users = ManyToManyHistoryField('User', related_name="media_likes")
+
+    remote = MediaManager(methods={
+        'get': 'media',
     })
 
     def __unicode__(self):
-        return u'%s: %s' % (self.author, self.text)
-
-    @property
-    def slug(self):
-        return '/%s/status/%d' % (self.author.screen_name, self.pk)
+        return self.id
 
     def parse(self):
-        self._response['favorites_count'] = self._response.pop('favorite_count', 0)
-        self._response['retweets_count'] = self._response.pop('retweet_count', 0)
+        self._response['caption'] = self._response['caption'].text
+        super(Media, self).parse()
 
-        self._response.pop('user', None)
-        self._response.pop('in_reply_to_screen_name', None)
-        self._response.pop('in_reply_to_user_id_str', None)
-        self._response.pop('in_reply_to_status_id_str', None)
+    def fetch_comments(self):
+        return Comment.remote.fetch_media_comments(self)
 
-        self._get_foreignkeys_for_fields('in_reply_to_status', 'in_reply_to_user')
+    def fetch_likes(self):
+        return User.remote.fetch_media_likes(self)
 
-        super(Status, self).parse()
 
-    def fetch_retweets(self, **kwargs):
-        return Status.remote.fetch_retweets(status=self, **kwargs)
 
-    def fetch_replies(self, **kwargs):
-        return Status.remote.fetch_replies(status=self, **kwargs)
+class CommentManager(InstagramManager):
+    def fetch_media_comments(self, media):
+
+        extra_fields = {}
+        extra_fields['fetched'] = timezone.now()
+        extra_fields['media_id'] = media.id
+
+        #comments
+        response = self.api.media_comments(media.id)
+        result = self.parse_response(response, extra_fields)
+        return [self.get_or_create_from_instance(instance) for instance in result]
+
+
+class Comment(InstagramBaseModel):
+
+    user = models.ForeignKey(User)
+    media = models.ForeignKey(Media, related_name="comments")
+
+    id = models.BigIntegerField(primary_key=True)
+    text = models.TextField()
+    created_at = models.DateTimeField()
+
+    remote = CommentManager()
+
+
+
+
