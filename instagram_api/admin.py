@@ -22,7 +22,11 @@ class UserAdmin(AllFieldsReadOnly):
     exclude = ('followers',)
 
 class MediaAdmin(AllFieldsReadOnly):
-    list_display = ['id', 'user', 'caption', 'created_time']
+    def instagram_link(self, obj):
+        return u'<a href="%s">%s</a>' % (obj.link, obj.link)
+    instagram_link.allow_tags = True
+
+    list_display = ['id', 'user', 'caption', 'created_time', 'instagram_link']
     search_fields = ('caption',)
 
 class CommentAdmin(AllFieldsReadOnly):
