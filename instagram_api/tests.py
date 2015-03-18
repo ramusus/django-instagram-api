@@ -9,6 +9,7 @@ from .factories import UserFactory, MediaFactory
 
 USER_ID = 237074561 # tnt_online
 MEDIA_ID = '934625295371059186_205828054'
+MEDIA_ID_2 = '806703315661297054_190931988' # media without caption
 
 
 class UserTest(TestCase):
@@ -48,6 +49,10 @@ class MediaTest(TestCase):
 
         self.assertGreater(m.fetched, self.time)
         self.assertIsInstance(m.created_time, datetime)
+
+        # media without caption test
+        m = Media.remote.fetch(MEDIA_ID_2)
+        self.assertEqual(len(m.caption), 0)
 
     def test_fetch_user_media(self):
         u = UserFactory(id=USER_ID)
