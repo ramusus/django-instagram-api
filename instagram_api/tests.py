@@ -11,7 +11,6 @@ USER_ID = 237074561 # tnt_online
 MEDIA_ID = '934625295371059186_205828054'
 
 
-
 class UserTest(TestCase):
 
     def setUp(self):
@@ -66,6 +65,13 @@ class MediaTest(TestCase):
 
         self.assertGreater(m.fetched, self.time)
         self.assertIsInstance(m.created_time, datetime)
+
+    def test_fetch_all_user_media(self):
+        u = User.remote.fetch(775667951)
+        medias = u.fetch_recent_media(all=True)
+
+        self.assertGreater(u.media_count, 20)
+        self.assertEqual(u.media_count, medias.count())
 
     def test_fetch_comments(self):
         m = Media.remote.fetch(MEDIA_ID)
