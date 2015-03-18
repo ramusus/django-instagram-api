@@ -229,14 +229,14 @@ class InstagramBaseModel(InstagramModel):
         self._tweepy_model = model
         self._response = dict(self._tweepy_model.__dict__)
 
-    @property
-    def tweepy(self):
-        if not self._tweepy_model:
-            # get fresh instance with the same ID, set tweepy object and refresh attributes
-            instance = self.__class__.remote.get(self.pk)
-            self.set_tweepy(instance.tweepy)
-            self.parse()
-        return self._tweepy_model
+#    @property
+#    def tweepy(self):
+#       if not self._tweepy_model:
+#            # get fresh instance with the same ID, set tweepy object and refresh attributes
+#            instance = self.__class__.remote.get(self.pk)
+#            self.set_tweepy(instance.tweepy)
+#            self.parse()
+#        return self._tweepy_model
 
 
 
@@ -264,25 +264,43 @@ class UserManager(InstagramManager):
     '''
 
 
-    def fetch_followers_for_user(self, user, all=False, count=50):
-        extra_fields = {}
-        extra_fields['fetched'] = timezone.now()
+    def fetch_followers_for_user(self, user, all=False, next_url=None, count=50, _extra_fields=None):
+        if not _extra_fields:
+            _extra_fields = {}
+            _extra_fields['fetched'] = timezone.now()
 
-        #users
-        response, next_ = self.api.user_followed_by(user.id)
+        if next_url:
+            url = next_url
+            r = requests.get(url)
+        else:
+            url = 'https://api.instagram.com/v1/users/%(user_id)s/followed-by' % {'user_id': user.id}
+            r = requests.get(url, params={'client_id': self.api.client_id}) #
 
-        result = self.parse_response(response, extra_fields)
+        j = r.json()
+        next_url = j['pagination'].get('next_url', None)
+
 
         instances = []
-        for instance in result:
-            i = self.get_or_create_from_instance(instance)
+        data = j['data']
+        for d in data:
+            i = self.get_or_create_from_resource(d, _extra_fields)
             instances.append(i)
             user.followers.add(i)
 
-        #return user.followers.all()
-        return instances
+        if all:
+            if next_url:
+                return self.fetch_followers_for_user(user, all=True, next_url=next_url, _extra_fields=_extra_fields)
+            else:
+                return user.followers.all()
+        else:
+            return instances
+
 
     def fetch_media_likes(self, media):
+        # TODO: get all likes
+        # https://instagram.com/developer/endpoints/likes/#get_media_likes
+        # no pagination to get all likes
+
         extra_fields = {}
         extra_fields['fetched'] = timezone.now()
 
@@ -340,7 +358,12 @@ class User(InstagramBaseModel):
 
 
 class MediaManager(InstagramManager):
-    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20):
+    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20, _extra_fields=None):
+        if not _extra_fields:
+            _extra_fields = {}
+            _extra_fields['fetched'] = timezone.now()
+            _extra_fields['user'] = user
+            _extra_fields['user_id'] = user.id
 
         if next_url:
             url = next_url
@@ -352,25 +375,21 @@ class MediaManager(InstagramManager):
         j = r.json()
         next_url = j['pagination'].get('next_url', None)
 
-        extra_fields = {}
-        extra_fields['fetched'] = timezone.now()
-        extra_fields['user'] = user
-        extra_fields['user_id'] = user.id
-
         instances = []
         data = j['data']
         for d in data:
             d['created_time'] = timestamp_to_datetime(d['created_time'])
-            d['caption'] = d['caption']['text']
             d['comment_count'] = d['comments']['count']
             d['like_count'] = d['likes']['count']
+            if d['caption']:
+                d['caption'] = d['caption']['text']
 
-            i = self.get_or_create_from_resource(d, extra_fields)
+            i = self.get_or_create_from_resource(d, _extra_fields)
             instances.append(i)
 
         if all:
             if next_url:
-                return self.fetch_user_recent_media(user, all=True, next_url=next_url)
+                return self.fetch_user_recent_media(user, all=True, next_url=next_url, _extra_fields=_extra_fields)
             else:
                 return user.media_feed.all()
         else:
@@ -381,7 +400,7 @@ class MediaManager(InstagramManager):
 class Media(InstagramBaseModel):
 
     id = models.CharField(max_length=100, primary_key=True)
-    caption = models.CharField(max_length=1000)
+    caption = models.CharField(max_length=1000, blank=True)
     link = models.URLField(max_length=300)
 
     #tags =
@@ -401,7 +420,8 @@ class Media(InstagramBaseModel):
         return self.id
 
     def parse(self):
-        self._response['caption'] = self._response['caption'].text
+        if self._response['caption']:
+            self._response['caption'] = self._response['caption'].text
         super(Media, self).parse()
 
     def fetch_comments(self):
@@ -409,6 +429,12 @@ class Media(InstagramBaseModel):
 
     def fetch_likes(self):
         return User.remote.fetch_media_likes(self)
+
+    def save(self, *args, **kwargs):
+        if self.caption is None:
+            self.caption = ""
+
+        super(Media, self).save(*args, **kwargs)
 
 
 
