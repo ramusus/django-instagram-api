@@ -361,9 +361,10 @@ class MediaManager(InstagramManager):
         data = j['data']
         for d in data:
             d['created_time'] = timestamp_to_datetime(d['created_time'])
-            d['caption'] = d['caption']['text']
             d['comment_count'] = d['comments']['count']
             d['like_count'] = d['likes']['count']
+            if d['caption']:
+                d['caption'] = d['caption']['text']
 
             i = self.get_or_create_from_resource(d, extra_fields)
             instances.append(i)
@@ -381,7 +382,7 @@ class MediaManager(InstagramManager):
 class Media(InstagramBaseModel):
 
     id = models.CharField(max_length=100, primary_key=True)
-    caption = models.CharField(max_length=1000)
+    caption = models.CharField(max_length=1000, blank=True)
     link = models.URLField(max_length=300)
 
     #tags =
@@ -401,7 +402,8 @@ class Media(InstagramBaseModel):
         return self.id
 
     def parse(self):
-        self._response['caption'] = self._response['caption'].text
+        if self._response['caption']:
+            self._response['caption'] = self._response['caption'].text
         super(Media, self).parse()
 
     def fetch_comments(self):
@@ -409,6 +411,12 @@ class Media(InstagramBaseModel):
 
     def fetch_likes(self):
         return User.remote.fetch_media_likes(self)
+
+    def save(self, *args, **kwargs):
+        if self.caption is None:
+            self.caption = ""
+
+        super(Media, self).save(*args, **kwargs)
 
 
 
