@@ -264,8 +264,9 @@ class UserManager(InstagramManager):
     '''
 
 
-    def fetch_followers_for_user(self, user, all=False, next_url=None, count=50, _extra_fields={}):
+    def fetch_followers_for_user(self, user, all=False, next_url=None, count=50, _extra_fields=None):
         if not _extra_fields:
+            _extra_fields = {}
             _extra_fields['fetched'] = timezone.now()
 
         if next_url:
@@ -288,7 +289,7 @@ class UserManager(InstagramManager):
 
         if all:
             if next_url:
-                return self.fetch_followers_for_user(user, all=True, next_url=next_url)
+                return self.fetch_followers_for_user(user, all=True, next_url=next_url, _extra_fields=_extra_fields)
             else:
                 return user.followers.all()
         else:
@@ -353,8 +354,9 @@ class User(InstagramBaseModel):
 
 
 class MediaManager(InstagramManager):
-    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20, _extra_fields={}):
+    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20, _extra_fields=None):
         if not _extra_fields:
+            _extra_fields = {}
             _extra_fields['fetched'] = timezone.now()
             _extra_fields['user'] = user
             _extra_fields['user_id'] = user.id
@@ -383,7 +385,7 @@ class MediaManager(InstagramManager):
 
         if all:
             if next_url:
-                return self.fetch_user_recent_media(user, all=True, next_url=next_url)
+                return self.fetch_user_recent_media(user, all=True, next_url=next_url, _extra_fields=_extra_fields)
             else:
                 return user.media_feed.all()
         else:
