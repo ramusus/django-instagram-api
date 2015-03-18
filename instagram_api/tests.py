@@ -8,6 +8,7 @@ from . models import User, Media, Comment
 from .factories import UserFactory, MediaFactory
 
 USER_ID = 237074561 # tnt_online
+USER_ID_3 = 1741896487 # about 400 followers
 MEDIA_ID = '934625295371059186_205828054'
 MEDIA_ID_2 = '806703315661297054_190931988' # media without caption
 
@@ -30,6 +31,13 @@ class UserTest(TestCase):
         self.assertGreater(u.media_count, 0)
 
         self.assertGreater(u.fetched, self.time)
+
+    def test_fetch_user_followers(self):
+        u = User.remote.fetch(USER_ID_3)
+        followers = u.fetch_followers(all=True)
+
+        self.assertGreater(u.followers_count, 50)
+        self.assertEqual(u.followers_count, followers.count())
 
 
 class MediaTest(TestCase):
