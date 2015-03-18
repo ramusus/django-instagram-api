@@ -264,9 +264,9 @@ class UserManager(InstagramManager):
     '''
 
 
-    def fetch_followers_for_user(self, user, all=False, next_url=None, count=50):
-        extra_fields = {}
-        extra_fields['fetched'] = timezone.now()
+    def fetch_followers_for_user(self, user, all=False, next_url=None, count=50, _extra_fields={}):
+        if not _extra_fields:
+            _extra_fields['fetched'] = timezone.now()
 
         if next_url:
             url = next_url
@@ -282,7 +282,7 @@ class UserManager(InstagramManager):
         instances = []
         data = j['data']
         for d in data:
-            i = self.get_or_create_from_resource(d, extra_fields)
+            i = self.get_or_create_from_resource(d, _extra_fields)
             instances.append(i)
             user.followers.add(i)
 
@@ -353,7 +353,11 @@ class User(InstagramBaseModel):
 
 
 class MediaManager(InstagramManager):
-    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20):
+    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20, _extra_fields={}):
+        if not _extra_fields:
+            _extra_fields['fetched'] = timezone.now()
+            _extra_fields['user'] = user
+            _extra_fields['user_id'] = user.id
 
         if next_url:
             url = next_url
@@ -365,11 +369,6 @@ class MediaManager(InstagramManager):
         j = r.json()
         next_url = j['pagination'].get('next_url', None)
 
-        extra_fields = {}
-        extra_fields['fetched'] = timezone.now()
-        extra_fields['user'] = user
-        extra_fields['user_id'] = user.id
-
         instances = []
         data = j['data']
         for d in data:
@@ -379,7 +378,7 @@ class MediaManager(InstagramManager):
             if d['caption']:
                 d['caption'] = d['caption']['text']
 
-            i = self.get_or_create_from_resource(d, extra_fields)
+            i = self.get_or_create_from_resource(d, _extra_fields)
             instances.append(i)
 
         if all:
