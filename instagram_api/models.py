@@ -229,14 +229,14 @@ class InstagramBaseModel(InstagramModel):
         self._tweepy_model = model
         self._response = dict(self._tweepy_model.__dict__)
 
-    @property
-    def tweepy(self):
-        if not self._tweepy_model:
-            # get fresh instance with the same ID, set tweepy object and refresh attributes
-            instance = self.__class__.remote.get(self.pk)
-            self.set_tweepy(instance.tweepy)
-            self.parse()
-        return self._tweepy_model
+#    @property
+#    def tweepy(self):
+#       if not self._tweepy_model:
+#            # get fresh instance with the same ID, set tweepy object and refresh attributes
+#            instance = self.__class__.remote.get(self.pk)
+#            self.set_tweepy(instance.tweepy)
+#            self.parse()
+#        return self._tweepy_model
 
 
 
