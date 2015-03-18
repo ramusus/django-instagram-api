@@ -297,6 +297,10 @@ class UserManager(InstagramManager):
 
 
     def fetch_media_likes(self, media):
+        # TODO: get all likes
+        # https://instagram.com/developer/endpoints/likes/#get_media_likes
+        # no pagination to get all likes
+
         extra_fields = {}
         extra_fields['fetched'] = timezone.now()
 
