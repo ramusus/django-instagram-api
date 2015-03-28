@@ -342,7 +342,12 @@ class MediaManager(InstagramManager):
         instances, next = self.api.user_recent_media(**kwargs)
         while next:
             instances_new, next = self.api.user_recent_media(with_next_url=next)
-            [instances.append(i) for i in instances_new]
+            for i in instances_new:
+                instances.append(i)
+                # count as parameter doesn't work
+                if count and len(instances) >= count:
+                    next = False
+                    break
 
         for instance in instances:
             instance = self.parse_response_object(instance, extra_fields)
