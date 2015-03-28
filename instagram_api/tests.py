@@ -4,20 +4,37 @@ from datetime import datetime
 from django.test import TestCase
 from django.utils import timezone
 
-from . models import User, Media, Comment
-from .factories import UserFactory, MediaFactory
+from .models import User, Media
+from .factories import UserFactory
 
-USER_ID = 237074561 # tnt_online
-USER_ID_2 = 775667951 # about 200 media
-USER_ID_3 = 1741896487 # about 400 followers
+USER_ID = 237074561  # tnt_online
+USER_NAME = 'tnt_online'
+USER_ID_2 = 775667951  # about 200 media
+USER_ID_3 = 1741896487  # about 400 followers
 MEDIA_ID = '934625295371059186_205828054'
-MEDIA_ID_2 = '806703315661297054_190931988' # media without caption
+MEDIA_ID_2 = '806703315661297054_190931988'  # media without caption
 
 
 class UserTest(TestCase):
-
     def setUp(self):
         self.time = timezone.now()
+
+    def test_fetch_user_by_name(self):
+
+        u = User.remote.get_by_slug(USER_NAME)
+
+        self.assertEqual(int(u.id), USER_ID)
+        self.assertEqual(u.username, 'tnt_online')
+        self.assertEqual(u.full_name, u'Телеканал ТНТ')
+        self.assertGreater(len(u.profile_picture), 0)
+        self.assertGreater(len(u.website), 0)
+
+    def test_search_users(self):
+
+        users = User.remote.search(USER_NAME)
+        self.assertGreater(len(users), 0)
+        for user in users:
+            self.assertIsInstance(user, User)
 
     def test_fetch_user(self):
         u = User.remote.fetch(USER_ID)
@@ -42,19 +59,18 @@ class UserTest(TestCase):
 
 
 class MediaTest(TestCase):
-
     def setUp(self):
         self.time = timezone.now()
 
     def test_fetch_media(self):
         m = Media.remote.fetch(MEDIA_ID)
 
-        self.assertEqual(m.id, MEDIA_ID)
+        self.assertEqual(m.remote_id, MEDIA_ID)
         self.assertGreater(len(m.caption), 0)
         self.assertGreater(len(m.link), 0)
 
-        self.assertGreater(m.comment_count, 0)
-        self.assertGreater(m.like_count, 0)
+        self.assertGreater(m.comments_count, 0)
+        self.assertGreater(m.likes_count, 0)
 
         self.assertGreater(m.fetched, self.time)
         self.assertIsInstance(m.created_time, datetime)
@@ -74,8 +90,8 @@ class MediaTest(TestCase):
         self.assertGreater(len(m.caption), 0)
         self.assertGreater(len(m.link), 0)
 
-        self.assertGreater(m.comment_count, 0)
-        self.assertGreater(m.like_count, 0)
+        self.assertGreater(m.comments_count, 0)
+        self.assertGreater(m.likes_count, 0)
 
         self.assertGreater(m.fetched, self.time)
         self.assertIsInstance(m.created_time, datetime)
@@ -92,8 +108,8 @@ class MediaTest(TestCase):
 
         comments = m.fetch_comments()
 
-        self.assertGreater(m.comment_count, 0)
-        self.assertEqual(m.comment_count, len(comments))
+        self.assertGreater(m.comments_count, 0)
+        self.assertEqual(m.comments_count, len(comments)) # TODO: strange bug of API
 
         c = comments[0]
         self.assertEqual(c.media, m)
@@ -108,7 +124,7 @@ class MediaTest(TestCase):
 
         likes = m.fetch_likes()
 
-        self.assertGreater(m.like_count, 0)
-        # self.assertEqual(m.like_count, len(likes)) # TODO: get all likes
+        self.assertGreater(m.likes_count, 0)
+        self.assertEqual(m.likes_count, likes.count())  # TODO: get all likes
 
 
