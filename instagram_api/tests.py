@@ -52,9 +52,9 @@ class UserTest(TestCase):
 
     def test_fetch_user_followers(self):
         u = User.remote.fetch(USER_ID_3)
-        followers = u.fetch_followers(all=True)
+        followers = u.fetch_followers()
 
-        self.assertGreater(u.followers_count, 50)
+        self.assertGreaterEqual(u.followers_count, 600)
         self.assertEqual(u.followers_count, followers.count())
 
 
@@ -116,8 +116,9 @@ class MediaTest(TestCase):
         u = User.remote.fetch(USER_ID_2)
         medias = u.fetch_recent_media(all=True)
 
-        self.assertGreater(u.media_count, 20)
+        self.assertGreater(u.media_count, 210)
         self.assertEqual(u.media_count, medias.count())
+        self.assertEqual(u.media_count, u.media_feed.count())
 
     def test_fetch_comments(self):
         m = Media.remote.fetch(MEDIA_ID)

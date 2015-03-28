@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.utils.functional import wraps
+from django.db.models.query import QuerySet
+
 
 def opt_arguments(func):
     '''
@@ -18,34 +20,53 @@ def opt_arguments(func):
     return meta_wrapper
 
 @opt_arguments
-def fetch_all(func, max_count):
+def fetch_all(func, return_all=None, always_all=False):
     """
     Class method decorator for fetching all items. Add parameter `all=False` for decored method.
     If `all` is True, method runs as many times as it returns any results.
-    Decorator receive 2 parameters:
-      * integer `max_count` - max number of items method able to return
+    Decorator receive parameters:
+      * callback method `return_all`. It's called with the same parameters
+        as decored method after all itmes are fetched.
+      * `always_all` bool - return all instances in any case of argument `all`
+        of decorated method
     Usage:
 
-    @fetch_all(max_count=200)
-    def fetch_something(self, ..., *kwargs):
+        @fetch_all(return_all=lambda self,instance,*a,**k: instance.items.all())
+        def fetch_something(self, ..., *kwargs):
         ....
     """
-    def wrapper(self, all=False, return_instances=None, *args, **kwargs):
-        if all:
-            if not return_instances:
-                return_instances = []
-            kwargs['count'] = max_count
-            instances = func(self, *args, **kwargs)
-            instances_count = len(instances)
-            return_instances += instances
+    def wrapper(self, all=False, instances_all=None, **kwargs):
+        response = {}
+        instances = func(self, **kwargs)
+        if len(instances) == 2 and isinstance(instances, tuple):
+            instances, response = instances
 
-            if instances_count > 1:
-                # TODO: make protection somehow from endless loop
-                kwargs['max_id'] = instances[instances_count-1].id
-                return wrapper(self, all=True, return_instances=return_instances, *args, **kwargs)
+        if always_all or all:
+            if isinstance(instances, QuerySet):
+                if instances_all is None:
+                    instances_all = instances.none()
+                instances_count = instances.count()
+                if instances_count:
+                    instances_all |= instances
+            elif isinstance(instances, list):
+                if instances_all is None:
+                    instances_all = []
+                instances_count = len(instances)
+                instances_all += instances
             else:
-                return self.model.objects.filter(id__in=[instance.id for instance in return_instances])
+                raise ValueError("Wrong type of response from func %s. It should be QuerySet or list, not a %s" % (func, type(instances)))
+
+            next_url = response['pagination'].get('next_url', None)
+            if next_url:
+                return wrapper(self, all=True, next_url=next_url, instances_all=instances_all, **kwargs)
+
+            if return_all:
+                kwargs['instances'] = instances_all
+                return return_all(self, **kwargs)
+            else:
+                return instances_all
+
         else:
-            return func(self, *args, **kwargs)
+            return instances
 
     return wraps(func)(wrapper)

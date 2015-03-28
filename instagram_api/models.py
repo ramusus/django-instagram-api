@@ -11,8 +11,10 @@ import requests
 from instagram.helper import timestamp_to_datetime
 from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
+
 from . import fields
 from .api import get_api
+from .decorators import fetch_all
 
 __all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 
@@ -237,35 +239,21 @@ class UserManager(InstagramManager):
 
         return self.parse_response_list(response, extra_fields)
 
-    def fetch_followers_for_user(self, user, all=False, next_url=None, count=50, _extra_fields=None):
-        if not _extra_fields:
-            _extra_fields = {}
-            _extra_fields['fetched'] = timezone.now()
+    def fetch_followers_for_user(self, user):
+        instances, next = self.api.user_followed_by(user.id)
+        while next:
+            instances_new, next = self.api.user_followed_by(with_next_url=next)
+            [instances.append(i) for i in instances_new]
 
-        if next_url:
-            url = next_url
-            r = requests.get(url)
-        else:
-            url = 'https://api.instagram.com/v1/users/%(user_id)s/followed-by' % {'user_id': user.id}
-            r = requests.get(url, params={'client_id': self.api.client_id})  #
-
-        json = r.json()
-        next_url = json['pagination'].get('next_url', None)
-
-        instances = []
-        for response in json['data']:
-            instance = self.parse_response_object(response, _extra_fields)
+        followers = []
+        for instance in instances:
+            instance = self.parse_response_object(instance, {'fetched': timezone.now()})
             instance = self.get_or_create_from_instance(instance)
-            instances.append(instance)
-            user.followers.add(instance)
+            followers.append(instance)
 
-        if all:
-            if next_url:
-                return self.fetch_followers_for_user(user, all=True, next_url=next_url, _extra_fields=_extra_fields)
-            else:
-                return user.followers.all()
-        else:
-            return instances
+        user.followers = followers
+
+        return user.followers.all()
 
     def fetch_media_likes(self, media):
         # TODO: get all likes
@@ -280,9 +268,12 @@ class UserManager(InstagramManager):
         response = self.api.media_likes(media.remote_id)
         result = self.parse_response(response, extra_fields)
 
+        instances = []
         for instance in result:
-            i = self.get_or_create_from_instance(instance)
-            media.likes_users.add(i)
+            instance = self.get_or_create_from_instance(instance)
+            instances.append(instance)
+
+        media.likes_users += instances
 
         return media.likes_users.all()
 
@@ -326,43 +317,27 @@ class User(InstagramBaseModel):
         super(User, self).parse()
 
     def fetch_followers(self, **kwargs):
-        return User.remote.fetch_followers_for_user(self, **kwargs)
+        return User.remote.fetch_followers_for_user(user=self, **kwargs)
 
     def fetch_recent_media(self, **kwargs):
-        return Media.remote.fetch_user_recent_media(self, **kwargs)
+        return Media.remote.fetch_user_recent_media(user=self, **kwargs)
 
 
 class MediaManager(InstagramManager):
-    def fetch_user_recent_media(self, user, all=False, next_url=None, count=20, _extra_fields=None):
-        if not _extra_fields:
-            _extra_fields = {}
-            _extra_fields['fetched'] = timezone.now()
-            _extra_fields['user'] = user
-            _extra_fields['user_id'] = user.id
 
-        if next_url:
-            url = next_url
-            r = requests.get(url)
-        else:
-            url = 'https://api.instagram.com/v1/users/%(user_id)s/media/recent/' % {'user_id': user.id}
-            r = requests.get(url, params={'client_id': self.api.client_id})  #
+    def fetch_user_recent_media(self, user):
+        extra_fields = {'fetched': timezone.now(), 'user': user, 'user_id': user.id}
 
-        json = r.json()
-        next_url = json['pagination'].get('next_url', None)
+        instances, next = self.api.user_recent_media(user_id=user.id)
+        while next:
+            instances_new, next = self.api.user_recent_media(with_next_url=next)
+            [instances.append(i) for i in instances_new]
 
-        instances = []
-        for response in json['data']:
-            instance = self.parse_response_object(response, _extra_fields)
+        for instance in instances:
+            instance = self.parse_response_object(instance, extra_fields)
             instance = self.get_or_create_from_instance(instance)
-            instances.append(instance)
 
-        if all:
-            if next_url:
-                return self.fetch_user_recent_media(user, all=True, next_url=next_url, _extra_fields=_extra_fields)
-            else:
-                return user.media_feed.all()
-        else:
-            return instances
+        return user.media_feed.all()
 
 
 class Media(InstagramBaseModel):
