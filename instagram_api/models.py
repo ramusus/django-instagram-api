@@ -370,10 +370,21 @@ class Media(InstagramBaseModel):
     caption = models.CharField(max_length=1000, blank=True)
     link = models.URLField(max_length=300)
 
+    type = models.CharField(max_length=20)
+
+    image_low_resolution = models.URLField(max_length=200)
+    image_standard_resolution = models.URLField(max_length=200)
+    image_thumbnail = models.URLField(max_length=200)
+
+    video_low_bandwidth = models.URLField(max_length=200)
+    video_low_resolution = models.URLField(max_length=200)
+    video_standard_resolution = models.URLField(max_length=200)
+
     created_time = models.DateTimeField()
 
     comments_count = models.PositiveIntegerField(null=True)
     likes_count = models.PositiveIntegerField(null=True)
+    actions_count = models.PositiveIntegerField(null=True)
 
     user = models.ForeignKey(User, related_name="media_feed")
     likes_users = ManyToManyHistoryField('User', related_name="likes_media")
@@ -391,6 +402,15 @@ class Media(InstagramBaseModel):
 
     def parse(self):
         self._response['remote_id'] = self._response.pop('id')
+
+        for prefix in ['video', 'image']:
+            key = '%ss' % prefix
+            if key in self._response:
+                for k, v in self._response[key].items():
+                    media = self._response[key][k]
+                    if isinstance(media, ApiModel):
+                        media = media.__dict__
+                    self._response['%s_%s' % (prefix, k)] = media['url']
 
         if not isinstance(self._response['created_time'], datetime):
             self._response['created_time'] = timestamp_to_datetime(self._response['created_time'])
@@ -419,9 +439,9 @@ class Media(InstagramBaseModel):
         return User.remote.fetch_media_likes(self)
 
     def save(self, *args, **kwargs):
+        self.actions_count = sum([getattr(self, field, None) or 0 for field in ['likes_count', 'comments_count']])
         if self.caption is None:
-            self.caption = ""
-
+           self.caption = ''
         super(Media, self).save(*args, **kwargs)
 
 

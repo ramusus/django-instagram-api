@@ -75,9 +75,25 @@ class MediaTest(TestCase):
         self.assertGreater(m.fetched, self.time)
         self.assertIsInstance(m.created_time, datetime)
 
+        self.assertEqual(m.type, 'video')
+
+        self.assertGreater(len(m.image_low_resolution), 0)
+        self.assertGreater(len(m.image_standard_resolution), 0)
+        self.assertGreater(len(m.image_thumbnail), 0)
+
+        self.assertGreater(len(m.video_low_bandwidth), 0)
+        self.assertGreater(len(m.video_low_resolution), 0)
+        self.assertGreater(len(m.video_standard_resolution), 0)
+
         # media without caption test
         m = Media.remote.fetch(MEDIA_ID_2)
         self.assertEqual(len(m.caption), 0)
+
+        self.assertEqual(m.type, 'image')
+
+        self.assertGreater(len(m.image_low_resolution), 0)
+        self.assertGreater(len(m.image_standard_resolution), 0)
+        self.assertGreater(len(m.image_thumbnail), 0)
 
     def test_fetch_user_media(self):
         u = UserFactory(id=USER_ID)
