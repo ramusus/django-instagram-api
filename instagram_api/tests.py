@@ -98,10 +98,10 @@ class MediaTest(TestCase):
     def test_fetch_user_media_count(self):
         u = UserFactory(id=USER_ID)
 
-        medias = u.fetch_recent_media(count=100)
-        m = medias[0]
+        media = u.fetch_media(count=100)
+        m = media[0]
 
-        self.assertEqual(medias.count(), 100)
+        self.assertEqual(media.count(), 100)
         self.assertEqual(m.user, u)
 
         self.assertGreater(len(m.caption), 0)
@@ -115,7 +115,7 @@ class MediaTest(TestCase):
 
     def test_fetch_all_user_media(self):
         u = User.remote.fetch(USER_ID_2)
-        medias = u.fetch_recent_media()
+        medias = u.fetch_media()
 
         self.assertGreater(u.media_count, 210)
         self.assertEqual(u.media_count, medias.count())
@@ -127,7 +127,7 @@ class MediaTest(TestCase):
         comments = m.fetch_comments()
 
         self.assertGreater(m.comments_count, 0)
-        self.assertEqual(m.comments_count, len(comments)) # TODO: strange bug of API
+        self.assertEqual(m.comments_count, len(comments))  # TODO: strange bug of API
 
         c = comments[0]
         self.assertEqual(c.media, m)

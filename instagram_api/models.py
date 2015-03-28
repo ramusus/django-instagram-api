@@ -2,6 +2,7 @@
 from datetime import datetime
 import logging
 import re
+import time
 
 from django.db import models
 from django.db.models.fields import FieldDoesNotExist
@@ -237,7 +238,7 @@ class UserManager(InstagramManager):
 
         return self.parse_response_list(response, extra_fields)
 
-    def fetch_followers_for_user(self, user):
+    def fetch_followers(self, user):
         instances, next = self.api.user_followed_by(user.id)
         while next:
             instances_new, next = self.api.user_followed_by(with_next_url=next)
@@ -315,25 +316,33 @@ class User(InstagramBaseModel):
         super(User, self).parse()
 
     def fetch_followers(self, **kwargs):
-        return User.remote.fetch_followers_for_user(user=self, **kwargs)
+        return User.remote.fetch_followers(user=self, **kwargs)
 
-    def fetch_recent_media(self, **kwargs):
-        return Media.remote.fetch_user_recent_media(user=self, **kwargs)
+    def fetch_media(self, **kwargs):
+        return Media.remote.fetch_user_media(user=self, **kwargs)
 
 
 class MediaManager(InstagramManager):
 
-    def fetch_user_recent_media(self, user, count=None):
+    def fetch_user_media(self, user, count=None, min_id=None, max_id=None, after=None, before=None):
         extra_fields = {'fetched': timezone.now(), 'user': user, 'user_id': user.id}
 
-        instances, next = self.api.user_recent_media(user_id=user.id)
+        kwargs = {'user_id': user.id}
+        if count:
+            kwargs['count'] = count
+        if min_id:
+            kwargs['min_id'] = min_id
+        if max_id:
+            kwargs['max_id'] = max_id
+        if after:
+            kwargs['min_timestamp'] = time.mktime(after.timetuple())
+        if before:
+            kwargs['max_timestamp'] = time.mktime(before.timetuple())
+
+        instances, next = self.api.user_recent_media(**kwargs)
         while next:
             instances_new, next = self.api.user_recent_media(with_next_url=next)
-            for i in instances_new:
-                instances.append(i)
-                if count and len(instances) >= count:
-                    next = False
-                    break
+            [instances.append(i) for i in instances_new]
 
         for instance in instances:
             instance = self.parse_response_object(instance, extra_fields)
