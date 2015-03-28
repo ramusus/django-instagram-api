@@ -95,12 +95,13 @@ class MediaTest(TestCase):
         self.assertGreater(len(m.image_standard_resolution), 0)
         self.assertGreater(len(m.image_thumbnail), 0)
 
-    def test_fetch_user_media(self):
+    def test_fetch_user_media_count(self):
         u = UserFactory(id=USER_ID)
 
-        medias = u.fetch_recent_media()
+        medias = u.fetch_recent_media(count=100)
         m = medias[0]
 
+        self.assertEqual(medias.count(), 100)
         self.assertEqual(m.user, u)
 
         self.assertGreater(len(m.caption), 0)
@@ -114,7 +115,7 @@ class MediaTest(TestCase):
 
     def test_fetch_all_user_media(self):
         u = User.remote.fetch(USER_ID_2)
-        medias = u.fetch_recent_media(all=True)
+        medias = u.fetch_recent_media()
 
         self.assertGreater(u.media_count, 210)
         self.assertEqual(u.media_count, medias.count())

@@ -7,14 +7,12 @@ from django.db import models
 from django.db.models.fields import FieldDoesNotExist
 from django.db.models.related import RelatedObject
 from django.utils import timezone
-import requests
 from instagram.helper import timestamp_to_datetime
 from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
 
 from . import fields
 from .api import get_api
-from .decorators import fetch_all
 
 __all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 
@@ -273,7 +271,7 @@ class UserManager(InstagramManager):
             instance = self.get_or_create_from_instance(instance)
             instances.append(instance)
 
-        media.likes_users += instances
+        media.likes_users = instances + list(media.likes_users.all())
 
         return media.likes_users.all()
 
@@ -325,13 +323,17 @@ class User(InstagramBaseModel):
 
 class MediaManager(InstagramManager):
 
-    def fetch_user_recent_media(self, user):
+    def fetch_user_recent_media(self, user, count=None):
         extra_fields = {'fetched': timezone.now(), 'user': user, 'user_id': user.id}
 
         instances, next = self.api.user_recent_media(user_id=user.id)
         while next:
             instances_new, next = self.api.user_recent_media(with_next_url=next)
-            [instances.append(i) for i in instances_new]
+            for i in instances_new:
+                instances.append(i)
+                if count and len(instances) >= count:
+                    next = False
+                    break
 
         for instance in instances:
             instance = self.parse_response_object(instance, extra_fields)
