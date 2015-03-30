@@ -385,8 +385,7 @@ class Media(InstagramBaseModel):
         'get': 'media',
     })
 
-    @property
-    def slug(self):
+    def get_url(self):
         return self.link
 
     def __unicode__(self):
@@ -462,8 +461,7 @@ class Comment(InstagramBaseModel):
 
     remote = CommentManager()
 
-    @property
-    def slug(self):
+    def get_url(self):
         return self.media.link
 
     def parse(self):
