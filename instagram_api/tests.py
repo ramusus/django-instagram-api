@@ -113,13 +113,23 @@ class MediaTest(TestCase):
         self.assertGreater(m.fetched, self.time)
         self.assertIsInstance(m.created_time, datetime)
 
-    def test_fetch_all_user_media(self):
+    def test_fetch_user_media(self):
         u = User.remote.fetch(USER_ID_2)
         medias = u.fetch_media()
 
-        self.assertGreater(u.media_count, 210)
-        self.assertEqual(u.media_count, medias.count())
-        self.assertEqual(u.media_count, u.media_feed.count())
+        self.assertGreater(medias.count(), 210)
+        self.assertEqual(medias.count(), u.media_count)
+        self.assertEqual(medias.count(), u.media_feed.count())
+
+        after = medias.order_by('-created_time')[50].created_time
+        Media.objects.all().delete()
+
+        self.assertEqual(u.media_feed.count(), 0)
+
+        medias = u.fetch_media(after=after)
+
+        self.assertEqual(medias.count(), 52)  # not 50 for some reason
+        self.assertEqual(medias.count(), u.media_feed.count())
 
     def test_fetch_comments(self):
         m = Media.remote.fetch(MEDIA_ID)

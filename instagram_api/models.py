@@ -342,10 +342,11 @@ class MediaManager(InstagramManager):
         instances, next = self.api.user_recent_media(**kwargs)
         while next:
             instances_new, next = self.api.user_recent_media(with_next_url=next)
+            instances_new = sorted(instances_new, reverse=True, key=lambda i: i.created_time)
             for i in instances_new:
                 instances.append(i)
-                # count as parameter doesn't work
-                if count and len(instances) >= count:
+                # strange, but API arguments doesn't work
+                if count and len(instances) >= count or after and i.created_time.replace(tzinfo=timezone.utc) <= after:
                     next = False
                     break
 
