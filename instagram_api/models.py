@@ -148,7 +148,11 @@ class InstagramModel(models.Model):
             setattr(self, field, instance)
         self._foreignkeys_pre_save = []
 
-        super(InstagramModel, self).save(*args, **kwargs)
+        try:
+            super(InstagramModel, self).save(*args, **kwargs)
+        except Exception as e:
+            import sys
+            raise type(e), type(e)(e.message + ' while saving %s' % self.__dict__), sys.exc_info()[2]
 
     def parse(self):
         """
@@ -359,7 +363,7 @@ class MediaManager(InstagramManager):
 
 class Media(InstagramBaseModel):
     remote_id = models.CharField(max_length=100, unique=True)
-    caption = models.CharField(max_length=1000, blank=True)
+    caption = models.TextField(blank=True)
     link = models.URLField(max_length=300)
 
     type = models.CharField(max_length=20)
