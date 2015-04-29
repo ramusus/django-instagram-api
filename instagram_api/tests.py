@@ -156,3 +156,5 @@ class MediaTest(TestCase):
         self.assertEqual(m.likes_count, likes.count())  # TODO: get all likes
 
 
+class InstagramApiTest(UserTest, MediaTest):
+    pass

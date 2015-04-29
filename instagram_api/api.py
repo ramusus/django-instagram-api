@@ -2,6 +2,7 @@ from django.conf import settings
 #from oauth_tokens.models import AccessToken
 
 from instagram.client import InstagramAPI
+from instagram import InstagramAPIError as InstagramError
 #from oauth_tokens.api import ApiAbstractBase, Singleton
 
 

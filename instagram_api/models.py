@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 import logging
+from django.db.utils import IntegrityError
 import re
 import time
 
-from django.db import models
+from django.db import models, connection
 from django.db.models.fields import FieldDoesNotExist
 from django.db.models.related import RelatedObject
 from django.utils import timezone
@@ -311,6 +312,19 @@ class User(InstagramBaseModel):
     @property
     def instagram_link(self):
         return u'https://instagram.com/%s/' % self.username
+
+    def save(self, *args, **kwargs):
+        try:
+            super(InstagramModel, self).save(*args, **kwargs)
+        except IntegrityError as e:
+            if 'username' in e.message:
+                # duplicate key value violates unique constraint "instagram_api_user_username_key"
+                # DETAIL: Key (username)=(...) already exists.
+                connection.close()
+                User.remote.fetch(User.objects.get(username=self.username).pk)
+                super(InstagramModel, self).save(*args, **kwargs)
+            else:
+                raise
 
     def parse(self):
         if isinstance(self._response, dict) and 'counts' in self._response:
