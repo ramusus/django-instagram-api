@@ -14,7 +14,7 @@ from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
 
 from . import fields
-from .api import get_api
+from .api import get_api, InstagramError
 
 __all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 
@@ -321,7 +321,14 @@ class User(InstagramBaseModel):
                 # duplicate key value violates unique constraint "instagram_api_user_username_key"
                 # DETAIL: Key (username)=(...) already exists.
                 connection.close()
-                User.remote.fetch(User.objects.get(username=self.username).pk)
+                user = User.objects.get(username=self.username)
+                try:
+                    User.remote.fetch(user.pk)
+                except InstagramError as e:
+                    if e.code == 400:
+                        user.delete()
+                    else:
+                        raise
                 super(InstagramModel, self).save(*args, **kwargs)
             else:
                 raise
