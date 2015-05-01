@@ -13,6 +13,13 @@ INSTAGRAM_CLIENT_ID = getattr(settings, 'INSTAGRAM_CLIENT_ID', None)
 #INSTAGRAM_API_ACCESS_TOKEN = getattr(settings, 'INSTAGRAM_API_ACCESS_TOKEN', None)
 
 
+@property
+def code(self):
+    return self.status_code
+
+
+InstagramError.code = code
+
 
 def get_api(*args, **kwargs):
     api = InstagramAPI(client_id=INSTAGRAM_CLIENT_ID)
