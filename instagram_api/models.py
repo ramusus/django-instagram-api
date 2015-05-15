@@ -307,7 +307,7 @@ class User(InstagramBaseModel):
         return self.username
 
     def __unicode__(self):
-        return self.full_name
+        return self.full_name or self.username
 
     @property
     def instagram_link(self):
