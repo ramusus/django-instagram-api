@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 
+import mock
+from django.conf import settings
 from django.test import TestCase
 from django.utils import timezone
+from instagram import models
+from instagram.bind import InstagramAPIError
 
-from .models import User, Media
 from .factories import UserFactory
+from .models import Media, User
 
 USER_ID = 237074561  # tnt_online
 USER_NAME = 'tnt_online'
@@ -13,6 +17,8 @@ USER_ID_2 = 775667951  # about 200 media
 USER_ID_3 = 1741896487  # about 400 followers
 MEDIA_ID = '934625295371059186_205828054'
 MEDIA_ID_2 = '806703315661297054_190931988'  # media without caption
+
+CLIENT_IDS = getattr(settings, 'INSTAGRAM_CLIENT_IDS', None)
 
 
 class UserTest(TestCase):
@@ -55,7 +61,7 @@ class UserTest(TestCase):
         followers = u.fetch_followers()
 
         self.assertGreaterEqual(u.followers_count, 600)
-        self.assertEqual(u.followers_count, followers.count())
+        self.assertEqual(u.followers_count, followers.count())  # TODO: strange bug of API
 
 
 class MediaTest(TestCase):
@@ -157,4 +163,14 @@ class MediaTest(TestCase):
 
 
 class InstagramApiTest(UserTest, MediaTest):
-    pass
+    def call(api, *a, **kw):
+        raise InstagramAPIError(503, "Rate limited", "Your client is making too many request per second")
+
+    @mock.patch('instagram.client.InstagramAPI.user', side_effect=call)
+    @mock.patch('instagram_api.api.InstagramApi.repeat_call',
+                side_effect=lambda *a, **kw: models.User.object_from_dictionary({'id': '205828054'}))
+    def test_client_rate_limit(self, call, repeat_call):
+        self.assertGreaterEqual(len(CLIENT_IDS), 2)
+        User.remote.fetch(USER_ID_2)
+        self.assertEqual(call.called, True)
+        self.assertEqual(repeat_call.called, True)

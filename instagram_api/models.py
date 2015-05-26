@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 import logging
-from django.db.utils import IntegrityError
 import re
 import time
 
 from django.db import models, connection
 from django.db.models.fields import FieldDoesNotExist
 from django.db.models.related import RelatedObject
+from django.db.utils import IntegrityError
 from django.utils import timezone
 from instagram.helper import timestamp_to_datetime
 from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
 
 from . import fields
-from .api import get_api, InstagramError
+from .api import api_call, InstagramError
 
 __all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
 
@@ -31,8 +31,6 @@ class InstagramManager(models.Manager):
     """
 
     def __init__(self, methods=None, remote_pk=None, *args, **kwargs):
-        self.api = get_api()
-
         if methods and len(methods.items()) < 1:
             raise ValueError('Argument methods must contains at least 1 specified method')
 
@@ -62,7 +60,7 @@ class InstagramManager(models.Manager):
     def api_call(self, method, *args, **kwargs):
         if method in self.methods:
             method = self.methods[method]
-        return getattr(self.api, method)(*args, **kwargs)
+        return api_call(method, *args, **kwargs)
 
     def fetch(self, *args, **kwargs):
         """
@@ -90,7 +88,7 @@ class InstagramManager(models.Manager):
         elif isinstance(response, ApiModel):
             return self.parse_response_object(response, extra_fields)
         else:
-            raise InstagramContentError('Instagram response should be list or dict, not %s' % response)
+            raise InstagramContentError('Instagram response should be list or ApiModel, not %s' % response)
 
     def parse_response_object(self, resource, extra_fields=None):
 
@@ -244,9 +242,9 @@ class UserManager(InstagramManager):
         return self.parse_response_list(response, extra_fields)
 
     def fetch_followers(self, user):
-        instances, next = self.api.user_followed_by(user.id)
+        instances, next = self.api_call('followers', user.id)
         while next:
-            instances_new, next = self.api.user_followed_by(with_next_url=next)
+            instances_new, next = self.api_call('followers', with_next_url=next)
             [instances.append(i) for i in instances_new]
 
         followers = []
@@ -269,7 +267,7 @@ class UserManager(InstagramManager):
         extra_fields['fetched'] = timezone.now()
 
         # users
-        response = self.api.media_likes(media.remote_id)
+        response = self.api_call('likes', media.remote_id)
         result = self.parse_response(response, extra_fields)
 
         instances = []
@@ -300,6 +298,8 @@ class User(InstagramBaseModel):
     remote = UserManager(methods={
         'get': 'user',
         'search': 'user_search',
+        'followers': 'user_followed_by',
+        'likes': 'media_likes',
     })
 
     @property
@@ -364,9 +364,9 @@ class MediaManager(InstagramManager):
         if before:
             kwargs['max_timestamp'] = time.mktime(before.timetuple())
 
-        instances, next = self.api.user_recent_media(**kwargs)
+        instances, next = self.api_call('recent_media', **kwargs)
         while next:
-            instances_new, next = self.api.user_recent_media(with_next_url=next)
+            instances_new, next = self.api_call('recent_media', with_next_url=next)
             instances_new = sorted(instances_new, reverse=True, key=lambda i: i.created_time)
             for i in instances_new:
                 instances.append(i)
@@ -408,6 +408,7 @@ class Media(InstagramBaseModel):
 
     remote = MediaManager(remote_pk=('remote_id',), methods={
         'get': 'media',
+        'recent_media': 'user_recent_media',
     })
 
     def get_url(self):
@@ -464,7 +465,7 @@ class Media(InstagramBaseModel):
 class CommentManager(InstagramManager):
     def fetch_media_comments(self, media):
         # comments
-        response = self.api.media_comments(media.remote_id)
+        response = self.api_call('comments', media.remote_id)
 
         extra_fields = {}
         extra_fields['fetched'] = timezone.now()
@@ -484,7 +485,9 @@ class Comment(InstagramBaseModel):
     text = models.TextField()
     created_time = models.DateTimeField()
 
-    remote = CommentManager()
+    remote = CommentManager(methods={
+        'comments': 'media_comments',
+    })
 
     def get_url(self):
         return self.media.link
