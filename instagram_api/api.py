@@ -46,8 +46,15 @@ class InstagramApi(ApiAbstractBase):
             e, self.method, args, kwargs, self.recursion_count))
         raise e
 
+    def handle_error_code_429(self, e, *args, **kwargs):
+        # Rate limited-Your client is making too many request per second
+        return self.handle_rate_limit_error(e, *args, **kwargs)
+
     def handle_error_code_503(self, e, *args, **kwargs):
         # Rate limited-Your client is making too many request per second
+        return self.handle_rate_limit_error(e, *args, **kwargs)
+
+    def handle_rate_limit_error(self, e, *args, **kwargs):
         self.used_access_tokens += [self.api.client_id]
         if len(self.used_access_tokens) == len(CLIENT_IDS):
             log.warning("All client ids are rate limited, wait for 1 hour")
