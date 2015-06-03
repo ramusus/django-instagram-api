@@ -11,7 +11,7 @@ from oauth_tokens.api import ApiAbstractBase, Singleton
 
 __all__ = ['get_api', ]
 
-CLIENT_IDS = getattr(settings, 'INSTAGRAM_API_CLIENT_IDS', None)
+CLIENT_IDS = getattr(settings, 'INSTAGRAM_API_CLIENT_IDS', [])
 
 log = logging.getLogger('instagram_api')
 
