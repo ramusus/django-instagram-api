@@ -18,7 +18,7 @@ USER_ID_3 = 1741896487  # about 400 followers
 MEDIA_ID = '934625295371059186_205828054'
 MEDIA_ID_2 = '806703315661297054_190931988'  # media without caption
 
-CLIENT_IDS = getattr(settings, 'INSTAGRAM_CLIENT_IDS', None)
+CLIENT_IDS = getattr(settings, 'INSTAGRAM_API_CLIENT_IDS', None)
 
 
 class UserTest(TestCase):
