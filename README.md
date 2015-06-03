@@ -16,7 +16,7 @@ Add into `settings.py` lines:
         'instagram_api',
     )
 
-    INSTAGRAM_CLIENT_ID = ''
+    INSTAGRAM_API_CLIENT_IDS = ['...']
 
 ## Usage examples
 

@@ -1,0 +1,32 @@
+language: python
+python:
+  - "2.7"
+env:
+  - DJANGO=1.4 DB=postgres
+  - DJANGO=1.5 DB=postgres
+  - DJANGO=1.6 DB=postgres
+  - DJANGO=1.7 DB=postgres
+before_script:
+  - mysql -e 'create database django;'
+  - psql -c 'create database django;' -U postgres
+install:
+  - if [[ $DB == mysql ]]; then pip install mysql-python; fi
+  - if [[ $DB == postgres ]]; then pip install psycopg2; fi
+  - DJANGO_VER=$(./travis_django_version.py $DJANGO)
+  - pip install $DJANGO_VER
+  - pip install simplejson
+  - pip install factory_boy
+  - pip install coveralls
+  - pip install mock
+  - pip install .
+script:
+  - django-admin.py --version
+  - coverage run --source=twitter_api quicktest.py twitter_api
+after_success:
+  - coveralls
+notifications:
+  email:
+    recipients:
+      - ramusus@gmail.com
+    on_success: change
+    on_failure: change
