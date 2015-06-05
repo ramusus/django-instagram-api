@@ -17,7 +17,7 @@ setup(
     zip_safe=False,  # because we're including media that Django needs
     install_requires=[
         'requests>=2.5.3',
-        'python-instagram>=1.3.0',
+        'python-instagram==1.3.0',
         'django-oauth-tokens>=0.5.4',
         'django-m2m-history>=0.2.2',
     ],
