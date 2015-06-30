@@ -37,6 +37,11 @@ class CommentAdmin(AllFieldsReadOnly):
     search_fields = ('text',)
 
 
+class TagAdmin(AllFieldsReadOnly):
+    list_display = ['id', 'name', 'media_count', 'created_time']
+    search_fields = ('name',)
+
+
 admin.site.register(User, UserAdmin)
 admin.site.register(Media, MediaAdmin)
 admin.site.register(Comment, CommentAdmin)

@@ -9,7 +9,7 @@ from instagram import models
 from instagram.bind import InstagramAPIError
 
 from .factories import UserFactory
-from .models import Media, User
+from .models import Media, User, Tag
 from .api import CLIENT_IDS
 
 
@@ -19,6 +19,8 @@ USER_ID_2 = 775667951  # about 200 media
 USER_ID_3 = 1741896487  # about 400 followers
 MEDIA_ID = '934625295371059186_205828054'
 MEDIA_ID_2 = '806703315661297054_190931988'  # media without caption
+TAG_NAME = "snowyday"
+TAG_SEARCH_NAME = "snowy"
 
 
 class UserTest(TestCase):
@@ -160,6 +162,32 @@ class MediaTest(TestCase):
 
         self.assertGreater(m.likes_count, 0)
         self.assertEqual(m.likes_count, likes.count())  # TODO: get all likes
+
+
+class TagTest(TestCase):
+    def setUp(self):
+        pass
+
+    def test_fetch_tag(self):
+        t = Tag.remote.fetch(TAG_NAME)
+
+        self.assertEqual(t.name, TAG_NAME)
+        self.assertGreater(t.media_count, 0)
+
+    def test_search_tags(self):
+
+        tags = Tag.remote.search(TAG_SEARCH_NAME)
+        self.assertGreater(len(tags), 0)
+        for tag in tags:
+            self.assertIsInstance(tag, Tag)
+
+    def test_fetch_tag_media(self):
+        t = Tag.remote.fetch("merrittislandnwr")
+        medias = t.fetch_media()
+
+        self.assertGreater(medias.count(), 0)
+
+        self.assertEqual(medias.count(), t.media_feed.count())
 
 
 class InstagramApiTest(UserTest, MediaTest):

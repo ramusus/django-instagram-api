@@ -44,3 +44,24 @@ class CommentFactory(factory.DjangoModelFactory):
 
     class Meta:
         model = models.Comment
+
+
+class TagFactory(factory.DjangoModelFactory):
+
+    id = factory.Sequence(lambda n: n)
+    name = factory.Sequence(lambda n: "".join([random.choice(string.letters) for i in xrange(29)]))
+    media_count = factory.LazyAttribute(lambda o: random.randint(0, 1000))
+
+    @factory.post_generation
+    def media_feed(self, create, extracted, **kwargs):
+        if not create:
+            # Simple build, do nothing.
+            return
+
+        if extracted:
+            # A list of groups were passed in, use them
+            for media in extracted:
+                self.media_feed.add(media)
+
+    class Meta:
+        model = models.Tag
