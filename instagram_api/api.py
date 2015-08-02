@@ -41,11 +41,6 @@ class InstagramApi(ApiAbstractBase):
     def get_api_response(self, *args, **kwargs):
         return getattr(self.api, self.method)(*args, **kwargs)
 
-    def log_and_raise(self, e, *args, **kwargs):
-        self.logger.error("Error '%s'. Method %s, args: %s, kwargs: %s, recursion count: %d" % (
-            e, self.method, args, kwargs, self.recursion_count))
-        raise e
-
     def handle_error_code_429(self, e, *args, **kwargs):
         # Rate limited-Your client is making too many request per second
         return self.handle_rate_limit_error(e, *args, **kwargs)
