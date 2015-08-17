@@ -226,7 +226,7 @@ class UserManager(InstagramManager):
         """
         Return existed User by slug or new intance with empty pk
         """
-        users = self.search(slug, count=1)
+        users = self.search(slug)
         for user in users:
             if user.username == slug:
                 return self.get(user.id)
