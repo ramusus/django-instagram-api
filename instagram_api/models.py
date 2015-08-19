@@ -6,17 +6,24 @@ import time
 
 from django.db import models, connection
 from django.db.models.fields import FieldDoesNotExist
-from django.db.models.related import RelatedObject
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from instagram.helper import timestamp_to_datetime
 from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
 
+try:
+    from django.db.models.related import RelatedObject as ForeignObjectRel
+except:
+    # django 1.8 +
+    from django.db.models.fields.related import ForeignObjectRel
+
 from . import fields
 from .api import api_call, InstagramError
 
-__all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager']
+__all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 
+           'InstagramModel', 'InstagramManager', 'UserManager'
+           'Tag', 'TagManager']
 
 log = logging.getLogger('instagram_api')
 
@@ -167,7 +174,7 @@ class InstagramModel(models.Model):
                 log.debug('Field with name "%s" doesn\'t exist in the model %s' % (key, type(self)))
                 continue
 
-            if isinstance(field, RelatedObject) and value:
+            if isinstance(field, ForeignObjectRel) and value:
                 # for item in value:
                 # rel_instance = field.model.remote.parse_response_object(item)
                 # self._external_links_post_save += [(field.field.name, rel_instance)]
@@ -206,7 +213,27 @@ class InstagramBaseModel(InstagramModel):
         return 'https://instagram.com/%s' % self.slug
 
 
-class UserManager(InstagramManager):
+class InstagramSearchMixin(object):
+    def search(self, q, *args, **kwargs):
+        kwargs['q'] = q
+        instances = self.api_call('search', *args, **kwargs)
+
+        if isinstance(instances[0], list) and (len(instances) > 1) and \
+                (isinstance(instances[1], basestring) or instances[1] is None):
+            _next = instances[1]
+            instances = instances[0]
+            while _next:
+                instances_new, _next = self.api_call('search',
+                                                     with_next_url=_next)
+                [instances.append(i) for i in instances_new]
+
+        extra_fields = kwargs.pop('extra_fields', {})
+        extra_fields['fetched'] = timezone.now()
+
+        return self.parse_response_list(instances, extra_fields)
+
+
+class UserManager(InstagramManager, InstagramSearchMixin):
 
     def fetch_by_slug(self, *args, **kwargs):
         result = self.get_by_slug(*args, **kwargs)
@@ -231,15 +258,6 @@ class UserManager(InstagramManager):
             if user.username == slug:
                 return self.get(user.id)
         raise ValueError("No users found for the name %s" % slug)
-
-    def search(self, q, *args, **kwargs):
-        kwargs['q'] = q
-        response = self.api_call('search', *args, **kwargs)
-
-        extra_fields = kwargs.pop('extra_fields', {})
-        extra_fields['fetched'] = timezone.now()
-
-        return self.parse_response_list(response, extra_fields)
 
     def fetch_followers(self, user):
         instances, next = self.api_call('followers', user.id)
@@ -349,10 +367,15 @@ class User(InstagramBaseModel):
 
 class MediaManager(InstagramManager):
 
-    def fetch_user_media(self, user, count=None, min_id=None, max_id=None, after=None, before=None):
-        extra_fields = {'fetched': timezone.now(), 'user': user, 'user_id': user.id}
+    def fetch_user_media(self, user, count=None, min_id=None, max_id=None, 
+                         after=None, before=None):
+
+        extra_fields = {'fetched': timezone.now(),
+                                  'user': user,
+                                  'user_id': user.id}
 
         kwargs = {'user_id': user.id}
+
         if count:
             kwargs['count'] = count
         if min_id:
@@ -380,6 +403,31 @@ class MediaManager(InstagramManager):
             instance = self.get_or_create_from_instance(instance)
 
         return user.media_feed.all()
+
+    def fetch_tag_media(self, tag, count=None, max_tag_id=None):
+
+        extra_fields = {'fetched': timezone.now()}
+
+        kwargs = {'tag_name': tag.name}
+        kwargs['count'] = count
+        kwargs['max_tag_id'] = max_tag_id
+
+        instances, _next = self.api_call('tag_recent_media', **kwargs)
+        while _next:
+            instances_new, _next = self.api_call('tag_recent_media',
+                                                 with_next_url=_next,
+                                                 tag_name=tag.name)
+            for i in instances_new:
+                instances.append(i)
+
+        for instance in instances:
+            extra_fields['user'] = User.remote.fetch(instance.user.id)
+            extra_fields['user_id'] = instance.user.id
+            instance = self.parse_response_object(instance, extra_fields)
+            instance = self.get_or_create_from_instance(instance)
+            instance.tags.add(tag)
+
+        return tag.media_feed.all()
 
 
 class Media(InstagramBaseModel):
@@ -458,7 +506,7 @@ class Media(InstagramBaseModel):
     def save(self, *args, **kwargs):
         self.actions_count = sum([getattr(self, field, None) or 0 for field in ['likes_count', 'comments_count']])
         if self.caption is None:
-           self.caption = ''
+            self.caption = ''
         super(Media, self).save(*args, **kwargs)
 
 
@@ -495,3 +543,23 @@ class Comment(InstagramBaseModel):
     def parse(self):
         self._response['created_time'] = self._response.pop('created_at')
         super(Comment, self).parse()
+
+
+class TagManager(InstagramManager, InstagramSearchMixin):
+    pass
+
+
+class Tag(InstagramBaseModel):
+    name = models.CharField(max_length=29, unique=True)
+    media_count = models.PositiveIntegerField(null=True)
+    media_feed = models.ManyToManyField(Media, related_name='tags')
+
+    remote = TagManager(methods={
+        'get': 'tag',
+        'recent_media': 'tag_recent_media',
+        'search': 'tag_search'
+    })
+
+    def fetch_media(self, count=None, max_tag_id=None):
+        return Media.remote.fetch_tag_media(self, count=count, 
+                                            max_tag_id=max_tag_id)

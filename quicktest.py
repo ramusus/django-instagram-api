@@ -146,10 +146,18 @@ class QuickDjangoTest(object):
             **settings_test
         )
 
-        from django.test.simple import DjangoTestSuiteRunner
+        try:
+            # Django <= 1.8
+            from django.test.simple import DjangoTestSuiteRunner
+            test_runner = DjangoTestSuiteRunner(verbosity=1)
+        except ImportError:
+            # Django >= 1.8
+            from django.test.runner import DiscoverRunner
+            test_runner = DiscoverRunner(verbosity=1)
+
         import django
         django.setup()
-        failures = DjangoTestSuiteRunner().run_tests(self.apps, verbosity=1)
+        failures = test_runner.run_tests(self.apps, verbosity=1)
         if failures:
             sys.exit(failures)
 
