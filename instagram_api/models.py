@@ -21,8 +21,7 @@ except:
 from . import fields
 from .api import api_call, InstagramError
 
-__all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 
-           'InstagramModel', 'InstagramManager', 'UserManager'
+__all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager'
            'Tag', 'TagManager']
 
 log = logging.getLogger('instagram_api')
@@ -223,8 +222,7 @@ class InstagramSearchMixin(object):
             _next = instances[1]
             instances = instances[0]
             while _next:
-                instances_new, _next = self.api_call('search',
-                                                     with_next_url=_next)
+                instances_new, _next = self.api_call('search', with_next_url=_next)
                 [instances.append(i) for i in instances_new]
 
         extra_fields = kwargs.pop('extra_fields', {})
@@ -367,7 +365,7 @@ class User(InstagramBaseModel):
 
 class MediaManager(InstagramManager):
 
-    def fetch_user_media(self, user, count=None, min_id=None, max_id=None, 
+    def fetch_user_media(self, user, count=None, min_id=None, max_id=None,
                          after=None, before=None):
 
         extra_fields = {'fetched': timezone.now(),
@@ -387,9 +385,9 @@ class MediaManager(InstagramManager):
         if before:
             kwargs['max_timestamp'] = time.mktime(before.timetuple())
 
-        instances, next = self.api_call('recent_media', **kwargs)
+        instances, next = self.api_call('user_recent_media', **kwargs)
         while next:
-            instances_new, next = self.api_call('recent_media', with_next_url=next)
+            instances_new, next = self.api_call('user_recent_media', with_next_url=next)
             instances_new = sorted(instances_new, reverse=True, key=lambda i: i.created_time)
             for i in instances_new:
                 instances.append(i)
@@ -400,7 +398,7 @@ class MediaManager(InstagramManager):
 
         for instance in instances:
             instance = self.parse_response_object(instance, extra_fields)
-            instance = self.get_or_create_from_instance(instance)
+            self.get_or_create_from_instance(instance)
 
         return user.media_feed.all()
 
@@ -414,11 +412,8 @@ class MediaManager(InstagramManager):
 
         instances, _next = self.api_call('tag_recent_media', **kwargs)
         while _next:
-            instances_new, _next = self.api_call('tag_recent_media',
-                                                 with_next_url=_next,
-                                                 tag_name=tag.name)
-            for i in instances_new:
-                instances.append(i)
+            instances_new, _next = self.api_call('tag_recent_media', with_next_url=_next, tag_name=tag.name)
+            [instances.append(i) for i in instances_new]
 
         for instance in instances:
             extra_fields['user'] = User.remote.fetch(instance.user.id)
@@ -456,7 +451,8 @@ class Media(InstagramBaseModel):
 
     remote = MediaManager(remote_pk=('remote_id',), methods={
         'get': 'media',
-        'recent_media': 'user_recent_media',
+        'user_recent_media': 'user_recent_media',
+        'tag_recent_media': 'tag_recent_media',
     })
 
     def get_url(self):
@@ -556,10 +552,11 @@ class Tag(InstagramBaseModel):
 
     remote = TagManager(methods={
         'get': 'tag',
-        'recent_media': 'tag_recent_media',
         'search': 'tag_search'
     })
 
+    def __unicode__(self):
+        return '#%s' % self.name
+
     def fetch_media(self, count=None, max_tag_id=None):
-        return Media.remote.fetch_tag_media(self, count=count, 
-                                            max_tag_id=max_tag_id)
+        return Media.remote.fetch_tag_media(self, count=count, max_tag_id=max_tag_id)
