@@ -20,6 +20,7 @@ except:
 
 from . import fields
 from .api import api_call, InstagramError
+from .decorators import atomic
 
 __all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager'
            'Tag', 'TagManager']
@@ -257,6 +258,7 @@ class UserManager(InstagramManager, InstagramSearchMixin):
                 return self.get(user.id)
         raise ValueError("No users found for the name %s" % slug)
 
+    @atomic
     def fetch_followers(self, user):
         instances, next = self.api_call('followers', user.id)
         while next:
@@ -269,7 +271,13 @@ class UserManager(InstagramManager, InstagramSearchMixin):
             instance = self.get_or_create_from_instance(instance)
             followers.append(instance)
 
+        initial = user.followers.versions.count() == 0
+
         user.followers = followers
+
+        if initial:
+            user.followers.get_query_set_through().update(time_from=None)
+            user.followers.versions.update(added_count=0)
 
         return user.followers.all()
 
