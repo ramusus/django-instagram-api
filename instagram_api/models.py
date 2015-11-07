@@ -452,7 +452,6 @@ class Media(InstagramBaseModel):
 
     comments_count = models.PositiveIntegerField(null=True)
     likes_count = models.PositiveIntegerField(null=True)
-    actions_count = models.PositiveIntegerField(null=True)
 
     user = models.ForeignKey(User, related_name="media_feed")
     likes_users = ManyToManyHistoryField('User', related_name="likes_media")
@@ -508,7 +507,6 @@ class Media(InstagramBaseModel):
         return User.remote.fetch_media_likes(self)
 
     def save(self, *args, **kwargs):
-        self.actions_count = sum([getattr(self, field, None) or 0 for field in ['likes_count', 'comments_count']])
         if self.caption is None:
             self.caption = ''
         super(Media, self).save(*args, **kwargs)
