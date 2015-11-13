@@ -339,12 +339,12 @@ class User(InstagramBaseModel):
 
     def save(self, *args, **kwargs):
         try:
-            super(InstagramModel, self).save(*args, **kwargs)
+            with atomic():
+                super(InstagramModel, self).save(*args, **kwargs)
         except IntegrityError as e:
             if 'username' in e.message:
                 # duplicate key value violates unique constraint "instagram_api_user_username_key"
                 # DETAIL: Key (username)=(...) already exists.
-                connection.close()
                 user = User.objects.get(username=self.username)
                 try:
                     User.remote.fetch(user.pk)
