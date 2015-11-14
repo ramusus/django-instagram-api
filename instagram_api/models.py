@@ -347,6 +347,12 @@ class User(InstagramBaseModel):
                 # DETAIL: Key (username)=(...) already exists.
                 user = User.objects.get(username=self.username)
                 try:
+                    # check for recursive loop
+                    user1 = User.objects.get(username=User.remote.get(user.pk).username)
+                    if user1.pk == self.pk:
+                        user.username = 'temp%s' % time.time()
+                        user.save()
+                    # fetch right user
                     User.remote.fetch(user.pk)
                 except InstagramError as e:
                     if e.code == 400:

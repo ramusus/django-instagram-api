@@ -66,15 +66,38 @@ class UserTest(TestCase):
         self.assertEqual(u.followers_count, followers.count())  # TODO: strange bug of API
 
     def test_fetch_duplicate_user(self):
+
         u = UserFactory(username='tnt_online')
 
+        self.assertEqual(User.objects.count(), 1)
         self.assertNotEqual(int(u.id), USER_ID)
         self.assertEqual(u.username, 'tnt_online')
 
         u = User.remote.fetch(USER_ID)
 
+        self.assertEqual(User.objects.count(), 1)
         self.assertEqual(int(u.id), USER_ID)
         self.assertEqual(u.username, 'tnt_online')
+
+    def test_fetch_duble_duplicate_user(self):
+
+        u1 = UserFactory(username='tnt_online', id=8910216)
+        u2 = UserFactory(username='bmwru', id=237074561)
+
+        self.assertEqual(User.objects.count(), 2)
+        self.assertEqual(int(u1.id), 8910216)
+        self.assertEqual(int(u2.id), 237074561)
+        self.assertEqual(u1.username, 'tnt_online')
+        self.assertEqual(u2.username, 'bmwru')
+
+        u1 = User.remote.fetch(8910216)
+        u2 = User.remote.fetch(237074561)
+
+        self.assertEqual(User.objects.count(), 2)
+        self.assertEqual(int(u1.id), 8910216)
+        self.assertEqual(int(u2.id), 237074561)
+        self.assertEqual(u1.username, 'bmwru')
+        self.assertEqual(u2.username, 'tnt_online')
 
 
 class MediaTest(TestCase):
