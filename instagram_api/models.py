@@ -348,8 +348,8 @@ class User(InstagramBaseModel):
                 user = User.objects.get(username=self.username)
                 try:
                     # check for recursive loop
-                    user1 = User.objects.get(username=User.remote.get(user.pk).username)
-                    if user1.pk == self.pk:
+                    users = User.objects.filter(username=User.remote.get(user.pk).username)
+                    if users and users[0].pk == self.pk:
                         user.username = 'temp%s' % time.time()
                         user.save()
                     # fetch right user
