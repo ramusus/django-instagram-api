@@ -63,7 +63,25 @@ class UserTest(TestCase):
         followers = u.fetch_followers()
 
         self.assertGreaterEqual(u.followers_count, 600)
-        self.assertEqual(u.followers_count, followers.count())  # TODO: strange bug of API
+        self.assertEqual(u.followers_count, followers.count())
+
+        # check counts for follower
+        f = followers[0]
+        self.assertIsNone(f.followers_count)
+        self.assertIsNone(f.follows_count)
+        self.assertIsNone(f.media_count)
+
+        f = User.remote.fetch(f.id)
+        self.assertIsNotNone(f.followers_count)
+        self.assertIsNotNone(f.follows_count)
+        self.assertIsNotNone(f.media_count)
+
+        # repeat fetching followers and check counts
+        u.fetch_followers()
+        f = User.objects.get(id=f.id)
+        self.assertIsNotNone(f.followers_count)
+        self.assertIsNotNone(f.follows_count)
+        self.assertIsNotNone(f.media_count)
 
     def test_fetch_duplicate_user(self):
 

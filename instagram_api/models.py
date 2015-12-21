@@ -314,6 +314,7 @@ class User(InstagramBaseModel):
     website = models.URLField(max_length=300)
 
     followers_count = models.PositiveIntegerField(null=True)
+    follows_count = models.PositiveIntegerField(null=True)
     media_count = models.PositiveIntegerField(null=True)
 
     followers = ManyToManyHistoryField('User', versions=True)
@@ -336,6 +337,12 @@ class User(InstagramBaseModel):
     @property
     def instagram_link(self):
         return u'https://instagram.com/%s/' % self.username
+
+    def _substitute(self, old_instance):
+        super(User, self)._substitute(old_instance)
+        # for field_name in ['followers_count', 'follows_count', 'media_count']:
+        #     if getattr(old_instance, field_name) is not None:
+        #         setattr(self, field_name, getattr(old_instance, field_name))
 
     def save(self, *args, **kwargs):
         try:
@@ -365,8 +372,10 @@ class User(InstagramBaseModel):
 
     def parse(self):
         if isinstance(self._response, dict) and 'counts' in self._response:
-            self._response['followers_count'] = self._response['counts']['followed_by']
-            self._response['media_count'] = self._response['counts']['media']
+            count = self._response['counts']
+            self._response['followers_count'] = count.get('followed_by', 0)
+            self._response['follows_count'] = count.get('follows', 0)
+            self._response['media_count'] = count.get('media', 0)
 
         super(User, self).parse()
 
