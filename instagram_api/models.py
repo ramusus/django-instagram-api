@@ -199,6 +199,17 @@ class InstagramModel(models.Model):
 
                 setattr(self, key, value)
 
+    def refresh(self):
+        """
+        Refresh current model with remote data
+        """
+        object = self.__class__.remote.fetch(getattr(self, self.refresh_pk))
+        self.__dict__.update(object.__dict__)
+
+    @property
+    def refresh_pk(self):
+        raise NotImplementedError("Property %s.refresh_pk should be specified" % self.__class__.__name__)
+
 
 class InstagramBaseModel(InstagramModel):
     _tweepy_model = None
@@ -326,6 +337,8 @@ class User(InstagramBaseModel):
         'followers': 'user_followed_by',
         'likes': 'media_likes',
     })
+
+    refresh_pk = 'id'
 
     @property
     def slug(self):

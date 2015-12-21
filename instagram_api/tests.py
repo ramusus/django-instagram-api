@@ -54,9 +54,20 @@ class UserTest(TestCase):
         self.assertGreater(len(u.website), 0)
 
         self.assertGreater(u.followers_count, 0)
+        self.assertGreater(u.follows_count, 0)
         self.assertGreater(u.media_count, 0)
 
         self.assertGreater(u.fetched, self.time)
+
+        u.followers_count = None
+        u.save()
+        self.assertIsNone(u.followers_count)
+
+        u.refresh()
+        self.assertGreater(u.followers_count, 0)
+
+        u = User.objects.get(id=u.id)
+        self.assertGreater(u.followers_count, 0)
 
     def test_fetch_user_followers(self):
         u = User.remote.fetch(USER_ID_3)
