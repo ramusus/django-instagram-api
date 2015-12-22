@@ -245,6 +245,22 @@ class InstagramSearchMixin(object):
 
 class UserManager(InstagramManager, InstagramSearchMixin):
 
+    def get(self, *args, **kwargs):
+        kwargs['is_private'] = False
+        try:
+            instance = super(UserManager, self).get(*args, **kwargs)
+        except InstagramError, e:
+            if e.code == 400:
+                try:
+                    instance = self.model.objects.get(pk=args[0])
+                    instance.is_private = True
+                except self.model.DoesNotExist:
+                    raise e
+            else:
+                raise
+
+        return instance
+
     def fetch_by_slug(self, *args, **kwargs):
         result = self.get_by_slug(*args, **kwargs)
         return self.get_or_create_from_instance(result)
@@ -329,6 +345,8 @@ class User(InstagramBaseModel):
     media_count = models.PositiveIntegerField(null=True)
 
     followers = ManyToManyHistoryField('User', versions=True)
+
+    is_private = models.NullBooleanField('Account is private')
 
     objects = models.Manager()
     remote = UserManager(methods={

@@ -10,11 +10,11 @@ from instagram.bind import InstagramAPIError
 
 from .factories import UserFactory
 from .models import Media, User, Tag
-from .api import CLIENT_IDS
+from .api import CLIENT_IDS, InstagramError
 
 
 USER_ID = 237074561  # tnt_online
-USER_NAME = 'tnt_online'
+USER_PRIVATE_ID = 176980649
 USER_ID_2 = 775667951  # about 200 media
 USER_ID_3 = 1741896487  # about 400 followers
 MEDIA_ID = '934625295371059186_205828054'
@@ -29,7 +29,7 @@ class UserTest(TestCase):
 
     def test_fetch_user_by_name(self):
 
-        u = User.remote.get_by_slug(USER_NAME)
+        u = User.remote.get_by_slug('tnt_online')
 
         self.assertEqual(int(u.id), USER_ID)
         self.assertEqual(u.username, 'tnt_online')
@@ -39,7 +39,7 @@ class UserTest(TestCase):
 
     def test_search_users(self):
 
-        users = User.remote.search(USER_NAME)
+        users = User.remote.search('tnt_online')
         self.assertGreater(len(users), 0)
         for user in users:
             self.assertIsInstance(user, User)
@@ -68,6 +68,18 @@ class UserTest(TestCase):
 
         u = User.objects.get(id=u.id)
         self.assertGreater(u.followers_count, 0)
+
+    def test_fetch_private_user(self):
+
+        with self.assertRaises(InstagramError):
+            User.remote.fetch(USER_PRIVATE_ID)
+
+        userf = UserFactory(id=USER_PRIVATE_ID)
+        user = User.remote.fetch(USER_PRIVATE_ID)
+
+        self.assertEqual(userf, user)
+        self.assertFalse(userf.is_private)
+        self.assertTrue(user.is_private)
 
     def test_fetch_user_followers(self):
         u = User.remote.fetch(USER_ID_3)
