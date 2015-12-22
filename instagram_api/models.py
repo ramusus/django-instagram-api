@@ -246,7 +246,9 @@ class InstagramSearchMixin(object):
 class UserManager(InstagramManager, InstagramSearchMixin):
 
     def get(self, *args, **kwargs):
-        kwargs['is_private'] = False
+        if 'extra_fields' not in kwargs:
+            kwargs['extra_fields'] = {}
+        kwargs['extra_fields']['is_private'] = False
         try:
             instance = super(UserManager, self).get(*args, **kwargs)
         except InstagramError, e:
