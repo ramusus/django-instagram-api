@@ -140,6 +140,19 @@ class UserTest(TestCase):
         self.assertEqual(u1.username, 'bmwru')
         self.assertEqual(u2.username, 'tnt_online')
 
+    def test_fetch_real_duplicates_user(self):
+
+        u = User.remote.fetch(2116301016)
+        self.assertEqual(u.username, 'elena2048')
+
+        with self.assertRaises(InstagramError):
+            User.remote.fetch(1206219929)
+
+        try:
+            User.remote.fetch(1206219929)
+        except InstagramError as e:
+            self.assertEqual(e.code, 400)
+
 
 class MediaTest(TestCase):
     def setUp(self):
