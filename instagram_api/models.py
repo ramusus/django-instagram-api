@@ -385,18 +385,24 @@ class User(InstagramBaseModel):
             if 'username' in e.message:
                 # duplicate key value violates unique constraint "instagram_api_user_username_key"
                 # DETAIL: Key (username)=(...) already exists.
-                user = User.objects.get(username=self.username)
+                user_local = User.objects.get(username=self.username)
                 try:
                     # check for recursive loop
-                    users = User.objects.filter(username=User.remote.get(user.pk).username)
-                    if users and users[0].pk == self.pk:
-                        user.username = 'temp%s' % time.time()
-                        user.save()
+                    # get remote user
+                    user_remote = User.remote.get(user_local.pk)
+                    try:
+                        user_local2 = User.objects.get(username=user_remote.username)
+                        # if users excahnge usernames or user is dead (400 error)
+                        if user_local2.pk == self.pk or user_remote.is_private:
+                            user_local.username = 'temp%s' % time.time()
+                            user_local.save()
+                    except User.DoesNotExist:
+                        pass
                     # fetch right user
-                    User.remote.fetch(user.pk)
+                    User.remote.fetch(user_local.pk)
                 except InstagramError as e:
                     if e.code == 400:
-                        user.delete()
+                        user_local.delete()
                     else:
                         raise
                 super(InstagramModel, self).save(*args, **kwargs)

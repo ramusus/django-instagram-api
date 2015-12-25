@@ -59,4 +59,5 @@ class InstagramApi(ApiAbstractBase):
 
 def api_call(*args, **kwargs):
     api = InstagramApi()
+    api.used_access_tokens = []
     return api.call(*args, **kwargs)

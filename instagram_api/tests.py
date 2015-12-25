@@ -8,7 +8,7 @@ from django.utils import timezone
 from instagram import models
 from instagram.bind import InstagramAPIError
 
-from .factories import UserFactory
+from .factories import UserFactory, MediaFactory
 from .models import Media, User, Tag
 from .api import CLIENT_IDS, InstagramError
 
@@ -146,12 +146,21 @@ class UserTest(TestCase):
         self.assertEqual(u.username, 'elena2048')
 
         with self.assertRaises(InstagramError):
-            User.remote.fetch(1206219929)
+            User.remote.get(1206219929)
 
         try:
-            User.remote.fetch(1206219929)
+            User.remote.get(1206219929)
         except InstagramError as e:
             self.assertEqual(e.code, 400)
+
+    def test_fetch_likes_with_real_duplicates_user(self):
+
+        user_dead = UserFactory(id=1525127853, username='ich_liebe_dich_05')
+        media = MediaFactory(remote_id='1129836810225933436_2235087902')
+        media.fetch_likes()
+
+        self.assertNotEqual(User.objects.get(username=user_dead.username), user_dead.id)
+        self.assertTrue('temp' in User.objects.get(id=user_dead.id).username)
 
 
 class MediaTest(TestCase):
