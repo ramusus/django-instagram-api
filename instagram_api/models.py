@@ -287,13 +287,20 @@ class UserManager(InstagramManager, InstagramSearchMixin):
                 return self.get(user.id)
         raise ValueError("No users found for the name %s" % slug)
 
-    @atomic
     def fetch_followers(self, user):
+        followers = self.get_followers(user)
+        followers = self.create_followers(user, followers)
+        return followers
+
+    def get_followers(self, user):
         instances, next = self.api_call('followers', user.id)
         while next:
             instances_new, next = self.api_call('followers', with_next_url=next)
             [instances.append(i) for i in instances_new]
+        return instances
 
+    @atomic
+    def create_followers(self, user, instances):
         followers = []
         for instance in instances:
             instance = self.parse_response_object(instance, {'fetched': timezone.now()})
