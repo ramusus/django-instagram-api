@@ -75,9 +75,14 @@ class InstagramManager(models.Manager):
         """
         result = self.get(*args, **kwargs)
         if isinstance(result, list):
-            return [self.get_or_create_from_instance(instance) for instance in result]
+            instances = self.model.objects.none()
+            for instance in result:
+                instance = self.get_or_create_from_instance(instance)
+                instances |= instance.__class__.objects.filter(pk=instance.pk)
+            return instances
         else:
             return self.get_or_create_from_instance(result)
+
 
     def get(self, *args, **kwargs):
         """
@@ -584,7 +589,13 @@ class CommentManager(InstagramManager):
         extra_fields['owner_id'] = media.user_id
 
         result = self.parse_response(response, extra_fields)
-        return [self.get_or_create_from_instance(instance) for instance in result]
+
+        instances = self.model.objects.none()
+        for instance in result:
+            instance = self.get_or_create_from_instance(instance)
+            instances |= instance.__class__.objects.filter(pk=instance.pk)
+
+        return instances
 
 
 class Comment(InstagramBaseModel):
