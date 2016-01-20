@@ -10,7 +10,7 @@ from instagram.bind import InstagramAPIError
 
 from .factories import UserFactory, MediaFactory
 from .models import Media, User, Tag
-from .api import CLIENT_IDS, InstagramError
+from .api import InstagramError
 
 
 USER_ID = 237074561  # tnt_online
@@ -287,15 +287,15 @@ class TagTest(TestCase):
         self.assertEqual(medias.count(), t.media_feed.count())
 
 
-class InstagramApiTest(UserTest, MediaTest):
-    def call(api, *a, **kw):
-        raise InstagramAPIError(503, "Rate limited", "Your client is making too many request per second")
-
-    @mock.patch('instagram.client.InstagramAPI.user', side_effect=call)
-    @mock.patch('instagram_api.api.InstagramApi.repeat_call',
-                side_effect=lambda *a, **kw: models.User.object_from_dictionary({'id': '205828054'}))
-    def test_client_rate_limit(self, call, repeat_call):
-        self.assertGreaterEqual(len(CLIENT_IDS), 2)
-        User.remote.fetch(USER_ID_2)
-        self.assertEqual(call.called, True)
-        self.assertEqual(repeat_call.called, True)
+# class InstagramApiTest(UserTest, MediaTest):
+#     def call(api, *a, **kw):
+#         raise InstagramAPIError(503, "Rate limited", "Your client is making too many request per second")
+#
+#     @mock.patch('instagram.client.InstagramAPI.user', side_effect=call)
+#     @mock.patch('instagram_api.api.InstagramApi.repeat_call',
+#                 side_effect=lambda *a, **kw: models.User.object_from_dictionary({'id': '205828054'}))
+#     def test_client_rate_limit(self, call, repeat_call):
+#         self.assertGreaterEqual(len(CLIENT_IDS), 2)
+#         User.remote.fetch(USER_ID_2)
+#         self.assertEqual(call.called, True)
+#         self.assertEqual(repeat_call.called, True)
