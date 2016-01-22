@@ -385,11 +385,9 @@ class User(InstagramBaseModel):
 
     def _substitute(self, old_instance):
         super(User, self)._substitute(old_instance)
-        if self.is_private is None and old_instance.is_private is not None:
-            self.is_private = old_instance.is_private
-        # for field_name in ['followers_count', 'follows_count', 'media_count']:
-        #     if getattr(old_instance, field_name) is not None:
-        #         setattr(self, field_name, getattr(old_instance, field_name))
+        for field_name in ['followers_count', 'follows_count', 'media_count', 'is_private']:
+            if getattr(self, field_name) is None and getattr(old_instance, field_name) is not None:
+                setattr(self, field_name, getattr(old_instance, field_name))
 
     def save(self, *args, **kwargs):
         try:
