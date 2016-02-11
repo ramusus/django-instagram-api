@@ -258,11 +258,26 @@ class UserManager(InstagramManager, InstagramSearchMixin):
             instance = super(UserManager, self).get(*args, **kwargs)
         except InstagramError, e:
             if e.code == 400:
-                try:
-                    instance = self.model.objects.get(pk=args[0])
-                    instance.is_private = True
-                except self.model.DoesNotExist:
-                    raise e
+                if e.error_type == 'APINotAllowedError':
+                    # {'error_message': 'you cannot view this resource',
+                    #  'error_type': 'APINotAllowedError',
+                    #  'status_code': 400}
+                    try:
+                        instance = self.model.objects.get(pk=args[0])
+                        instance.is_private = True
+                        instance.save()
+                    except self.model.DoesNotExist:
+                        raise e
+                elif e.error_type == 'APINotFoundError':
+                    # {'error_message': 'this user does not exist',
+                    #  'error_type': 'APINotFoundError',
+                    #  'status_code': 400}
+                    try:
+                        instance = self.model.objects.get(pk=args[0])
+                        instance.delete()
+                        raise
+                    except self.model.DoesNotExist:
+                        raise e
             else:
                 raise
 

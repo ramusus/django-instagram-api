@@ -1,10 +1,12 @@
-# Django Instagram API
+Django Instagram API
+====================
 
 [![Build Status](https://travis-ci.org/ramusus/django-instagram-api.png?branch=master)](https://travis-ci.org/ramusus/django-instagram-api) [![Coverage Status](https://coveralls.io/repos/ramusus/django-instagram-api/badge.png?branch=master)](https://coveralls.io/r/ramusus/django-instagram-api)
 
-Application for interacting with Instagram API objects using Django model interface
+Application for interaction with Instagram API objects using Django ORM
 
-## Installation
+Installation
+------------
 
     pip install django-instagram-api
 
@@ -25,7 +27,8 @@ Add into `settings.py` lines:
     OAUTH_TOKENS_TWITTER_USERNAME = ''                                 # user login
     OAUTH_TOKENS_TWITTER_PASSWORD = ''                                 # user password
 
-## Usage examples
+Usage examples
+--------------
 
 ### Simple API request
 

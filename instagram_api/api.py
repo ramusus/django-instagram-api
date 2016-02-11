@@ -1,12 +1,10 @@
-import random
 import logging
 from time import sleep
 
 from django.conf import settings
+from social_api.api import ApiAbstractBase, Singleton
 from instagram.client import InstagramAPI
 from instagram import InstagramAPIError as InstagramError
-from oauth_tokens.api import ApiAbstractBase, Singleton
-from oauth_tokens.models import UserCredentials
 
 
 __all__ = ['get_api', ]
@@ -47,7 +45,7 @@ class InstagramApi(ApiAbstractBase):
 
     def handle_rate_limit_error(self, e, *args, **kwargs):
         self.used_access_tokens += [self.api.access_token]
-        if len(self.used_access_tokens) == UserCredentials.objects.filter(provider='instagram', active=True).count():
+        if len(self.used_access_tokens) == len(self.tokens):
             log.warning("All access tokens are rate limited, need to wait 600 sec")
             sleep(600)
             self.used_access_tokens = []
