@@ -4,7 +4,7 @@ import logging
 import re
 import time
 
-from django.db import models, connection
+from django.db import models
 from django.db.models.fields import FieldDoesNotExist
 from django.db.utils import IntegrityError
 from django.utils import timezone
@@ -14,7 +14,7 @@ from m2m_history.fields import ManyToManyHistoryField
 
 try:
     from django.db.models.related import RelatedObject as ForeignObjectRel
-except:
+except ImportError:
     # django 1.8 +
     from django.db.models.fields.related import ForeignObjectRel
 
@@ -83,7 +83,6 @@ class InstagramManager(models.Manager):
         else:
             return self.get_or_create_from_instance(result)
 
-
     def get(self, *args, **kwargs):
         """
         Retrieve objects from remote server
@@ -129,6 +128,7 @@ class InstagramManager(models.Manager):
 
 
 class InstagramModel(models.Model):
+    refresh_pk = 'id'
     objects = models.Manager()
 
     class Meta:
@@ -138,9 +138,8 @@ class InstagramModel(models.Model):
         super(InstagramModel, self).__init__(*args, **kwargs)
 
         # different lists for saving related objects
-        self._external_links_post_save = []
-        self._foreignkeys_pre_save = []
-        self._external_links_to_add = []
+        self.relations_post_save = {'fk': {}, 'm2m': {}}
+        self.relations_pre_save = []
 
     def _substitute(self, old_instance):
         """
@@ -148,16 +147,15 @@ class InstagramModel(models.Model):
         Can be overrided in child models
         """
         self.pk = old_instance.pk
-        # self.created_at = old_instance.created_at
 
     def save(self, *args, **kwargs):
         """
         Save all related instances before or after current instance
         """
-        for field, instance in self._foreignkeys_pre_save:
+        for field, instance in self.relations_pre_save:
             instance = instance.__class__.remote.get_or_create_from_instance(instance)
             setattr(self, field, instance)
-        self._foreignkeys_pre_save = []
+        self.relations_pre_save = []
 
         try:
             super(InstagramModel, self).save(*args, **kwargs)
@@ -180,19 +178,20 @@ class InstagramModel(models.Model):
                 continue
 
             if isinstance(field, ForeignObjectRel) and value:
-                # for item in value:
-                # rel_instance = field.model.remote.parse_response_object(item)
-                # self._external_links_post_save += [(field.field.name, rel_instance)]
-                pass
+                self.relations_post_save['fk'][key] = [field.model.remote.parse_response_object(item)
+                                                       for item in value]
+            elif isinstance(field, models.ManyToManyField) and value:
+                self.relations_post_save['m2m'][key] = [field.rel.to.remote.parse_response_object(item)
+                                                        for item in value]
             else:
-                if isinstance(field, (models.BooleanField)):
+                if isinstance(field, models.BooleanField):
                     value = bool(value)
 
                 elif isinstance(field, (models.OneToOneField, models.ForeignKey)) and value:
                     rel_instance = field.rel.to.remote.parse_response_object(value)
                     value = rel_instance
                     if isinstance(field, models.ForeignKey):
-                        self._foreignkeys_pre_save += [(key, rel_instance)]
+                        self.relations_pre_save += [(key, rel_instance)]
 
                 elif isinstance(field, (fields.CommaSeparatedCharField,
                                         models.CommaSeparatedIntegerField)) and isinstance(value, list):
@@ -202,18 +201,17 @@ class InstagramModel(models.Model):
                     if isinstance(value, (str, unicode)):
                         value = value.strip()
 
+                elif isinstance(field, models.IntegerField) and value:
+                    value = int(value)
+
                 setattr(self, key, value)
 
     def refresh(self):
         """
         Refresh current model with remote data
         """
-        object = self.__class__.remote.fetch(getattr(self, self.refresh_pk))
-        self.__dict__.update(object.__dict__)
-
-    @property
-    def refresh_pk(self):
-        raise NotImplementedError("Property %s.refresh_pk should be specified" % self.__class__.__name__)
+        instance = self.__class__.remote.fetch(getattr(self, self.refresh_pk))
+        self.__dict__.update(instance.__dict__)
 
 
 class InstagramBaseModel(InstagramModel):
@@ -229,15 +227,15 @@ class InstagramBaseModel(InstagramModel):
         return 'https://instagram.com/%s' % self.slug
 
 
-class InstagramSearchMixin(object):
-    def search(self, q, *args, **kwargs):
-        kwargs['q'] = q
-        instances = self.api_call('search', *args, **kwargs)
+class InstagramSearchManager(InstagramManager):
+    def search(self, q=None, **kwargs):
+        if q:
+            kwargs['q'] = q
+        instances = self.api_call('search', **kwargs)
 
         if isinstance(instances[0], list) and (len(instances) > 1) and \
                 (isinstance(instances[1], basestring) or instances[1] is None):
-            _next = instances[1]
-            instances = instances[0]
+            instances, _next = instances
             while _next:
                 instances_new, _next = self.api_call('search', with_next_url=_next)
                 [instances.append(i) for i in instances_new]
@@ -248,14 +246,14 @@ class InstagramSearchMixin(object):
         return self.parse_response_list(instances, extra_fields)
 
 
-class UserManager(InstagramManager, InstagramSearchMixin):
+class UserManager(InstagramSearchManager):
 
     def get(self, *args, **kwargs):
         if 'extra_fields' not in kwargs:
             kwargs['extra_fields'] = {}
         kwargs['extra_fields']['is_private'] = False
         try:
-            instance = super(UserManager, self).get(*args, **kwargs)
+            return super(UserManager, self).get(*args, **kwargs)
         except InstagramError, e:
             if e.code == 400:
                 if e.error_type == 'APINotAllowedError':
@@ -266,6 +264,7 @@ class UserManager(InstagramManager, InstagramSearchMixin):
                         instance = self.model.objects.get(pk=args[0])
                         instance.is_private = True
                         instance.save()
+                        return instance
                     except self.model.DoesNotExist:
                         raise e
                 elif e.error_type == 'APINotFoundError':
@@ -281,8 +280,6 @@ class UserManager(InstagramManager, InstagramSearchMixin):
             else:
                 raise
 
-        return instance
-
     def fetch_by_slug(self, *args, **kwargs):
         result = self.get_by_slug(*args, **kwargs)
         return self.get_or_create_from_instance(result)
@@ -290,6 +287,7 @@ class UserManager(InstagramManager, InstagramSearchMixin):
     def get_by_url(self, url):
         """
         Return object by url
+        :param url:
         """
         m = re.findall(r'(?:https?://)?(?:www\.)?instagram\.com/([^/]+)/?', url)
         if not len(m):
@@ -300,6 +298,7 @@ class UserManager(InstagramManager, InstagramSearchMixin):
     def get_by_slug(self, slug):
         """
         Return existed User by slug or new intance with empty pk
+        :param slug:
         """
         users = self.search(slug)
         for user in users:
@@ -313,9 +312,9 @@ class UserManager(InstagramManager, InstagramSearchMixin):
         return followers
 
     def get_followers(self, user):
-        instances, next = self.api_call('followers', user.id)
-        while next:
-            instances_new, next = self.api_call('followers', with_next_url=next)
+        instances, _next = self.api_call('followers', user.id)
+        while _next:
+            instances_new, _next = self.api_call('followers', with_next_url=_next)
             [instances.append(i) for i in instances_new]
         return instances
 
@@ -343,8 +342,7 @@ class UserManager(InstagramManager, InstagramSearchMixin):
         # no pagination to get all likes
         # http://stackoverflow.com/questions/20478485/get-a-list-of-users-who-have-liked-a-media-not-working-anymore
 
-        extra_fields = {}
-        extra_fields['fetched'] = timezone.now()
+        extra_fields = {'fetched': timezone.now()}
 
         # users
         response = self.api_call('likes', media.remote_id)
@@ -385,8 +383,6 @@ class User(InstagramBaseModel):
         'likes': 'media_likes',
     })
 
-    refresh_pk = 'id'
-
     @property
     def slug(self):
         return self.username
@@ -413,25 +409,19 @@ class User(InstagramBaseModel):
                 # duplicate key value violates unique constraint "instagram_api_user_username_key"
                 # DETAIL: Key (username)=(...) already exists.
                 user_local = User.objects.get(username=self.username)
+                # check for recursive loop
+                # get remote user
+                user_remote = User.remote.get(user_local.pk)
                 try:
-                    # check for recursive loop
-                    # get remote user
-                    user_remote = User.remote.get(user_local.pk)
-                    try:
-                        user_local2 = User.objects.get(username=user_remote.username)
-                        # if users excahnge usernames or user is dead (400 error)
-                        if user_local2.pk == self.pk or user_remote.is_private:
-                            user_local.username = 'temp%s' % time.time()
-                            user_local.save()
-                    except User.DoesNotExist:
-                        pass
-                    # fetch right user
-                    User.remote.fetch(user_local.pk)
-                except InstagramError as e:
-                    if e.code == 400:
-                        user_local.delete()
-                    else:
-                        raise
+                    user_local2 = User.objects.get(username=user_remote.username)
+                    # if users excahnge usernames or user is dead (400 error)
+                    if user_local2.pk == self.pk or user_remote.is_private:
+                        user_local.username = 'temp%s' % time.time()
+                        user_local.save()
+                except User.DoesNotExist:
+                    pass
+                # fetch right user
+                User.remote.fetch(user_local.pk)
                 super(InstagramModel, self).save(*args, **kwargs)
             else:
                 raise
@@ -445,8 +435,8 @@ class User(InstagramBaseModel):
 
         super(User, self).parse()
 
-    def fetch_followers(self, **kwargs):
-        return User.remote.fetch_followers(user=self, **kwargs)
+    def fetch_followers(self):
+        return User.remote.fetch_followers(user=self)
 
     def fetch_media(self, **kwargs):
         return Media.remote.fetch_user_media(user=self, **kwargs)
@@ -457,10 +447,7 @@ class MediaManager(InstagramManager):
     def fetch_user_media(self, user, count=None, min_id=None, max_id=None,
                          after=None, before=None):
 
-        extra_fields = {'fetched': timezone.now(),
-                                  'user': user,
-                                  'user_id': user.id}
-
+        extra_fields = {'fetched': timezone.now(), 'user': user, 'user_id': user.id}
         kwargs = {'user_id': user.id}
 
         if count:
@@ -474,15 +461,15 @@ class MediaManager(InstagramManager):
         if before:
             kwargs['max_timestamp'] = time.mktime(before.timetuple())
 
-        instances, next = self.api_call('user_recent_media', **kwargs)
-        while next:
-            instances_new, next = self.api_call('user_recent_media', with_next_url=next)
-            instances_new = sorted(instances_new, reverse=True, key=lambda i: i.created_time)
+        instances, _next = self.api_call('user_recent_media', **kwargs)
+        while _next:
+            instances_new, _next = self.api_call('user_recent_media', with_next_url=_next)
+            instances_new = sorted(instances_new, reverse=True, key=lambda j: j.created_time)
             for i in instances_new:
                 instances.append(i)
                 # strange, but API arguments doesn't work
                 if count and len(instances) >= count or after and i.created_time.replace(tzinfo=timezone.utc) <= after:
-                    next = False
+                    _next = False
                     break
 
         for instance in instances:
@@ -495,10 +482,7 @@ class MediaManager(InstagramManager):
 
         extra_fields = {'fetched': timezone.now()}
 
-        kwargs = {'tag_name': tag.name}
-        kwargs['count'] = count
-        kwargs['max_tag_id'] = max_tag_id
-
+        kwargs = {'tag_name': tag.name, 'count': count, 'max_tag_id': max_tag_id}
         instances, _next = self.api_call('tag_recent_media', **kwargs)
         while _next:
             instances_new, _next = self.api_call('tag_recent_media', with_next_url=_next, tag_name=tag.name)
@@ -513,6 +497,29 @@ class MediaManager(InstagramManager):
 
         return tag.media_feed.all()
 
+    def fetch_location_media(self, location, count=None, max_id=None):
+
+        extra_fields = {'fetched': timezone.now()}
+
+        kwargs = {'location_id': location.id, 'count': count, 'max_id': max_id}
+        instances, _next = self.api_call('location_recent_media', **kwargs)
+        while _next:
+            instances_new, _next = self.api_call('location_recent_media', with_next_url=_next, location_id=location.id)
+            [instances.append(i) for i in instances_new]
+
+        for instance in instances:
+            extra_fields['user'] = User.remote.fetch(instance.user.id)
+            extra_fields['user_id'] = instance.user.id
+            instance = self.parse_response_object(instance, extra_fields)
+            instance = self.get_or_create_from_instance(instance)
+            instance.locations.add(location)
+
+        if count is None:
+            location.media_count = location.media_feed.count()
+            location.save()
+
+        return location.media_feed.all()
+
 
 class Media(InstagramBaseModel):
     remote_id = models.CharField(max_length=100, unique=True)
@@ -520,6 +527,7 @@ class Media(InstagramBaseModel):
     link = models.URLField(max_length=300)
 
     type = models.CharField(max_length=20)
+    filter = models.CharField(max_length=40)
 
     image_low_resolution = models.URLField(max_length=200)
     image_standard_resolution = models.URLField(max_length=200)
@@ -534,13 +542,16 @@ class Media(InstagramBaseModel):
     comments_count = models.PositiveIntegerField(null=True)
     likes_count = models.PositiveIntegerField(null=True)
 
-    user = models.ForeignKey(User, related_name="media_feed")
     likes_users = ManyToManyHistoryField('User', related_name="likes_media")
+    user = models.ForeignKey(User, related_name="media_feed")
+    tags = models.ManyToManyField('Tag', related_name='media_feed')
+    locations = models.ManyToManyField('Location', related_name='media_feed')
 
     remote = MediaManager(remote_pk=('remote_id',), methods={
         'get': 'media',
         'user_recent_media': 'user_recent_media',
         'tag_recent_media': 'tag_recent_media',
+        'location_recent_media': 'location_recent_media',
     })
 
     def get_url(self):
@@ -579,6 +590,9 @@ class Media(InstagramBaseModel):
         elif isinstance(self._response['caption'], dict):
             self._response['caption'] = self._response['caption']['text']
 
+        if 'likes' in self._response:
+            self._response['likes_users'] = self._response.pop('likes')
+
         super(Media, self).parse()
 
     def fetch_comments(self):
@@ -590,19 +604,26 @@ class Media(InstagramBaseModel):
     def save(self, *args, **kwargs):
         if self.caption is None:
             self.caption = ''
+
         super(Media, self).save(*args, **kwargs)
+
+        for field, relations in self.relations_post_save['fk'].items():
+            extra_fields = {'media_id': self.pk, 'owner_id': self.user.pk} if field == 'comments' else {}
+            for instance in relations:
+                instance.__dict__.update(extra_fields)
+                instance.__class__.remote.get_or_create_from_instance(instance)
+
+        for field, relations in self.relations_post_save['m2m'].items():
+            for instance in relations:
+                instance = instance.__class__.remote.get_or_create_from_instance(instance)
+                getattr(self, field).add(instance)
 
 
 class CommentManager(InstagramManager):
     def fetch_media_comments(self, media):
-        # comments
         response = self.api_call('comments', media.remote_id)
 
-        extra_fields = {}
-        extra_fields['fetched'] = timezone.now()
-        extra_fields['media_id'] = media.id
-        extra_fields['owner_id'] = media.user_id
-
+        extra_fields = {'fetched': timezone.now(), 'media_id': media.id, 'owner_id': media.user_id}
         result = self.parse_response(response, extra_fields)
 
         instances = self.model.objects.none()
@@ -634,16 +655,16 @@ class Comment(InstagramBaseModel):
         super(Comment, self).parse()
 
 
-class TagManager(InstagramManager, InstagramSearchMixin):
+class TagManager(InstagramSearchManager):
     pass
 
 
 class Tag(InstagramBaseModel):
-    name = models.CharField(max_length=29, unique=True)
+    refresh_pk = 'name'
+    name = models.CharField(max_length=50, unique=True)
     media_count = models.PositiveIntegerField(null=True)
-    media_feed = models.ManyToManyField(Media, related_name='tags')
 
-    remote = TagManager(methods={
+    remote = TagManager(remote_pk=('name',), methods={
         'get': 'tag',
         'search': 'tag_search'
     })
@@ -651,5 +672,33 @@ class Tag(InstagramBaseModel):
     def __unicode__(self):
         return '#%s' % self.name
 
-    def fetch_media(self, count=None, max_tag_id=None):
-        return Media.remote.fetch_tag_media(self, count=count, max_tag_id=max_tag_id)
+    def fetch_media(self, **kwargs):
+        return Media.remote.fetch_tag_media(tag=self, **kwargs)
+
+
+class LocationManager(InstagramSearchManager):
+    pass
+
+
+class Location(InstagramBaseModel):
+    id = models.BigIntegerField(primary_key=True)
+    name = models.CharField(max_length=100)
+    latitude = models.FloatField(null=True)
+    longitude = models.FloatField(null=True)
+    media_count = models.PositiveIntegerField(null=True)
+
+    remote = LocationManager(methods={
+        'get': 'location',
+        'search': 'location_search'
+    })
+
+    def __unicode__(self):
+        return self.name
+
+    def fetch_media(self, **kwargs):
+        return Media.remote.fetch_location_media(location=self, **kwargs)
+
+    def parse(self):
+        super(Location, self).parse()
+        self.latitude = self._response['point'].latitude
+        self.longitude = self._response['point'].longitude

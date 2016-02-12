@@ -6,8 +6,8 @@ from django.utils import timezone
 from social_api.api import override_api_context
 from unittest.case import _sentinel, _AssertRaisesContext
 
-from .factories import UserFactory, MediaFactory
-from .models import Media, User, Tag
+from .factories import UserFactory, LocationFactory, TagFactory
+from .models import Media, User, Tag, Location
 from .api import InstagramError
 
 
@@ -17,8 +17,10 @@ USER_ID_2 = 775667951  # about 200 media
 USER_ID_3 = 1741896487  # about 400 followers
 MEDIA_ID = '934625295371059186_205828054'
 MEDIA_ID_2 = '806703315661297054_190931988'  # media without caption
+LOCATION_ID = 1
 TAG_NAME = "snowyday"
 TAG_SEARCH_NAME = "snowy"
+LOCATION_SEARCH_NAME = "Dog Patch Labs"
 
 TOKEN = '1687258424.fac34ad.34a30c3152014c41abde0da40740077c'
 
@@ -84,7 +86,7 @@ class UserTest(TestCase):
         self.assertEqual(u.followers_count, followers.count())
 
         # check counts for follower
-        f = followers[1]
+        f = followers[2]
         self.assertIsNone(f.followers_count)
         self.assertIsNone(f.follows_count)
         self.assertIsNone(f.media_count)
@@ -106,7 +108,7 @@ class UserTest(TestCase):
     def test_fetch_duplicate_user(self):
 
         with override_api_context('instagram', token=TOKEN):
-            u = UserFactory(username='tnt_online')
+            u = UserFactory(id=0, username='tnt_online')
 
         self.assertEqual(User.objects.count(), 1)
         self.assertNotEqual(int(u.id), USER_ID)
@@ -200,14 +202,18 @@ class MediaTest(TestCase):
         self.assertIsInstance(m.created_time, datetime)
 
         self.assertEqual(m.type, 'video')
+        self.assertEqual(m.filter, 'Normal')
 
         self.assertGreater(len(m.image_low_resolution), 0)
         self.assertGreater(len(m.image_standard_resolution), 0)
         self.assertGreater(len(m.image_thumbnail), 0)
-
         self.assertGreater(len(m.video_low_bandwidth), 0)
         self.assertGreater(len(m.video_low_resolution), 0)
         self.assertGreater(len(m.video_standard_resolution), 0)
+
+        self.assertGreater(m.comments.count(), 0)
+        self.assertGreater(m.tags.count(), 0)
+        self.assertGreater(m.likes_users.count(), 0)
 
         # media without caption test
         with override_api_context('instagram', token=TOKEN):
@@ -219,6 +225,9 @@ class MediaTest(TestCase):
         self.assertGreater(len(m.image_low_resolution), 0)
         self.assertGreater(len(m.image_standard_resolution), 0)
         self.assertGreater(len(m.image_thumbnail), 0)
+
+        self.assertGreater(m.comments.count(), 0)
+        self.assertGreater(m.likes_users.count(), 0)
 
     def test_fetch_user_media_count(self):
         u = UserFactory(id=USER_ID)
@@ -242,22 +251,22 @@ class MediaTest(TestCase):
     def test_fetch_user_media(self):
         with override_api_context('instagram', token=TOKEN):
             u = User.remote.fetch(USER_ID_2)
-            medias = u.fetch_media()
+            media = u.fetch_media()
 
-        self.assertGreater(medias.count(), 210)
-        self.assertEqual(medias.count(), u.media_count)
-        self.assertEqual(medias.count(), u.media_feed.count())
+        self.assertGreater(media.count(), 210)
+        self.assertEqual(media.count(), u.media_count)
+        self.assertEqual(media.count(), u.media_feed.count())
 
-        after = medias.order_by('-created_time')[50].created_time
+        after = media.order_by('-created_time')[50].created_time
         Media.objects.all().delete()
 
         self.assertEqual(u.media_feed.count(), 0)
 
         with override_api_context('instagram', token=TOKEN):
-            medias = u.fetch_media(after=after)
+            media = u.fetch_media(after=after)
 
-        self.assertEqual(medias.count(), 52)  # not 50 for some reason
-        self.assertEqual(medias.count(), u.media_feed.count())
+        self.assertEqual(media.count(), 52)  # not 50 for some reason
+        self.assertEqual(media.count(), u.media_feed.count())
 
     def test_fetch_comments(self):
         with override_api_context('instagram', token=TOKEN):
@@ -285,9 +294,6 @@ class MediaTest(TestCase):
 
 
 class TagTest(TestCase):
-    def setUp(self):
-        pass
-
     def test_fetch_tag(self):
         with override_api_context('instagram', token=TOKEN):
             t = Tag.remote.fetch(TAG_NAME)
@@ -307,10 +313,39 @@ class TagTest(TestCase):
     def test_fetch_tag_media(self):
         with override_api_context('instagram', token=TOKEN):
             t = Tag.remote.fetch("merrittislandnwr")
-            medias = t.fetch_media()
+            media = t.fetch_media()
 
-        self.assertGreater(medias.count(), 0)
-        self.assertEqual(medias.count(), t.media_feed.count())
+        self.assertGreater(media.count(), 0)
+        self.assertEqual(media.count(), t.media_feed.count())
+
+
+class LocationTest(TestCase):
+    def test_fetch_location(self):
+        with override_api_context('instagram', token=TOKEN):
+            location = Location.remote.fetch(LOCATION_ID)
+
+        self.assertEqual(location.id, LOCATION_ID)
+        self.assertEqual(location.name, "Dog Patch Labs")
+        self.assertEqual(location.latitude, 37.782492553)
+        self.assertEqual(location.longitude, -122.387785235)
+        self.assertEqual(location.media_count, None)
+
+    def test_search_locations(self):
+        with override_api_context('instagram', token=TOKEN):
+            locations = Location.remote.search(lat=37.782492553, lng=-122.387785235)
+
+        self.assertGreater(len(locations), 0)
+        for location in locations:
+            self.assertIsInstance(location, Location)
+
+    def test_fetch_location_media(self):
+        with override_api_context('instagram', token=TOKEN):
+            location = LocationFactory(id=LOCATION_ID)
+            media = location.fetch_media()
+
+        self.assertGreater(media.count(), 0)
+        self.assertEqual(media.count(), location.media_feed.count())
+        self.assertEqual(media.count(), location.media_count)
 
 
 # class InstagramApiTest(UserTest, MediaTest):
