@@ -303,7 +303,7 @@ class UserManager(InstagramSearchManager):
         users = self.search(slug)
         for user in users:
             if user.username == slug:
-                return self.get(user.id)
+                return self.get(user.pk)
         raise ValueError("No users found for the name %s" % slug)
 
     def fetch_followers(self, user):
@@ -312,7 +312,7 @@ class UserManager(InstagramSearchManager):
         return followers
 
     def get_followers(self, user):
-        instances, _next = self.api_call('followers', user.id)
+        instances, _next = self.api_call('followers', user.pk)
         while _next:
             instances_new, _next = self.api_call('followers', with_next_url=_next)
             [instances.append(i) for i in instances_new]
@@ -409,19 +409,25 @@ class User(InstagramBaseModel):
                 # duplicate key value violates unique constraint "instagram_api_user_username_key"
                 # DETAIL: Key (username)=(...) already exists.
                 user_local = User.objects.get(username=self.username)
-                # check for recursive loop
-                # get remote user
-                user_remote = User.remote.get(user_local.pk)
                 try:
-                    user_local2 = User.objects.get(username=user_remote.username)
-                    # if users excahnge usernames or user is dead (400 error)
-                    if user_local2.pk == self.pk or user_remote.is_private:
-                        user_local.username = 'temp%s' % time.time()
-                        user_local.save()
-                except User.DoesNotExist:
-                    pass
-                # fetch right user
-                User.remote.fetch(user_local.pk)
+                    # check for recursive loop
+                    # get remote user
+                    user_remote = User.remote.get(user_local.pk)
+                    try:
+                        user_local2 = User.objects.get(username=user_remote.username)
+                        # if users excahnge usernames or user is dead (400 error)
+                        if user_local2.pk == self.pk or user_remote.is_private:
+                            user_local.username = 'temp%s' % time.time()
+                            user_local.save()
+                    except User.DoesNotExist:
+                        pass
+                    # fetch right user
+                    User.remote.fetch(user_local.pk)
+                except InstagramError as e:
+                    if e.code == 400:
+                        user_local.delete()
+                    else:
+                        raise
                 super(InstagramModel, self).save(*args, **kwargs)
             else:
                 raise
@@ -447,8 +453,8 @@ class MediaManager(InstagramManager):
     def fetch_user_media(self, user, count=None, min_id=None, max_id=None,
                          after=None, before=None):
 
-        extra_fields = {'fetched': timezone.now(), 'user': user, 'user_id': user.id}
-        kwargs = {'user_id': user.id}
+        extra_fields = {'fetched': timezone.now(), 'user_id': user.pk}
+        kwargs = {'user_id': user.pk}
 
         if count:
             kwargs['count'] = count
@@ -489,7 +495,6 @@ class MediaManager(InstagramManager):
             [instances.append(i) for i in instances_new]
 
         for instance in instances:
-            extra_fields['user'] = User.remote.fetch(instance.user.id)
             extra_fields['user_id'] = instance.user.id
             instance = self.parse_response_object(instance, extra_fields)
             instance = self.get_or_create_from_instance(instance)
@@ -501,18 +506,17 @@ class MediaManager(InstagramManager):
 
         extra_fields = {'fetched': timezone.now()}
 
-        kwargs = {'location_id': location.id, 'count': count, 'max_id': max_id}
+        kwargs = {'location_id': location.pk, 'count': count, 'max_id': max_id}
         instances, _next = self.api_call('location_recent_media', **kwargs)
         while _next:
-            instances_new, _next = self.api_call('location_recent_media', with_next_url=_next, location_id=location.id)
+            instances_new, _next = self.api_call('location_recent_media', with_next_url=_next, location_id=location.pk)
             [instances.append(i) for i in instances_new]
 
         for instance in instances:
-            extra_fields['user'] = User.remote.fetch(instance.user.id)
             extra_fields['user_id'] = instance.user.id
+            extra_fields['location_id'] = location.pk
             instance = self.parse_response_object(instance, extra_fields)
             instance = self.get_or_create_from_instance(instance)
-            instance.locations.add(location)
 
         if count is None:
             location.media_count = location.media_feed.count()
@@ -542,10 +546,10 @@ class Media(InstagramBaseModel):
     comments_count = models.PositiveIntegerField(null=True)
     likes_count = models.PositiveIntegerField(null=True)
 
+    user = models.ForeignKey('User', related_name="media_feed")
+    location = models.ForeignKey('Location', null=True, related_name="media_feed")
     likes_users = ManyToManyHistoryField('User', related_name="likes_media")
-    user = models.ForeignKey(User, related_name="media_feed")
     tags = models.ManyToManyField('Tag', related_name='media_feed')
-    locations = models.ManyToManyField('Location', related_name='media_feed')
 
     remote = MediaManager(remote_pk=('remote_id',), methods={
         'get': 'media',
@@ -608,7 +612,7 @@ class Media(InstagramBaseModel):
         super(Media, self).save(*args, **kwargs)
 
         for field, relations in self.relations_post_save['fk'].items():
-            extra_fields = {'media_id': self.pk, 'owner_id': self.user.pk} if field == 'comments' else {}
+            extra_fields = {'media_id': self.pk, 'owner_id': self.user_id} if field == 'comments' else {}
             for instance in relations:
                 instance.__dict__.update(extra_fields)
                 instance.__class__.remote.get_or_create_from_instance(instance)
@@ -623,7 +627,7 @@ class CommentManager(InstagramManager):
     def fetch_media_comments(self, media):
         response = self.api_call('comments', media.remote_id)
 
-        extra_fields = {'fetched': timezone.now(), 'media_id': media.id, 'owner_id': media.user_id}
+        extra_fields = {'fetched': timezone.now(), 'media_id': media.pk, 'owner_id': media.user_id}
         result = self.parse_response(response, extra_fields)
 
         instances = self.model.objects.none()
