@@ -128,7 +128,7 @@ class InstagramManager(models.Manager):
 
 
 class InstagramModel(models.Model):
-    refresh_pk = 'id'
+    _refresh_pk = 'id'
     objects = models.Manager()
 
     class Meta:
@@ -138,8 +138,8 @@ class InstagramModel(models.Model):
         super(InstagramModel, self).__init__(*args, **kwargs)
 
         # different lists for saving related objects
-        self.relations_post_save = {'fk': {}, 'm2m': {}}
-        self.relations_pre_save = []
+        self._relations_post_save = {'fk': {}, 'm2m': {}}
+        self._relations_pre_save = []
 
     def _substitute(self, old_instance):
         """
@@ -152,10 +152,10 @@ class InstagramModel(models.Model):
         """
         Save all related instances before or after current instance
         """
-        for field, instance in self.relations_pre_save:
+        for field, instance in self._relations_pre_save:
             instance = instance.__class__.remote.get_or_create_from_instance(instance)
             setattr(self, field, instance)
-        self.relations_pre_save = []
+        self._relations_pre_save = []
 
         try:
             super(InstagramModel, self).save(*args, **kwargs)
@@ -178,10 +178,10 @@ class InstagramModel(models.Model):
                 continue
 
             if isinstance(field, ForeignObjectRel) and value:
-                self.relations_post_save['fk'][key] = [field.model.remote.parse_response_object(item)
+                self._relations_post_save['fk'][key] = [field.model.remote.parse_response_object(item)
                                                        for item in value]
             elif isinstance(field, models.ManyToManyField) and value:
-                self.relations_post_save['m2m'][key] = [field.rel.to.remote.parse_response_object(item)
+                self._relations_post_save['m2m'][key] = [field.rel.to.remote.parse_response_object(item)
                                                         for item in value]
             else:
                 if isinstance(field, models.BooleanField):
@@ -191,7 +191,7 @@ class InstagramModel(models.Model):
                     rel_instance = field.rel.to.remote.parse_response_object(value)
                     value = rel_instance
                     if isinstance(field, models.ForeignKey):
-                        self.relations_pre_save += [(key, rel_instance)]
+                        self._relations_pre_save += [(key, rel_instance)]
 
                 elif isinstance(field, (fields.CommaSeparatedCharField,
                                         models.CommaSeparatedIntegerField)) and isinstance(value, list):
@@ -210,7 +210,7 @@ class InstagramModel(models.Model):
         """
         Refresh current model with remote data
         """
-        instance = self.__class__.remote.fetch(getattr(self, self.refresh_pk))
+        instance = self.__class__.remote.fetch(getattr(self, self._refresh_pk))
         self.__dict__.update(instance.__dict__)
 
 
@@ -620,13 +620,13 @@ class Media(InstagramBaseModel):
 
         super(Media, self).save(*args, **kwargs)
 
-        for field, relations in self.relations_post_save['fk'].items():
+        for field, relations in self._relations_post_save['fk'].items():
             extra_fields = {'media_id': self.pk, 'owner_id': self.user_id} if field == 'comments' else {}
             for instance in relations:
                 instance.__dict__.update(extra_fields)
                 instance.__class__.remote.get_or_create_from_instance(instance)
 
-        for field, relations in self.relations_post_save['m2m'].items():
+        for field, relations in self._relations_post_save['m2m'].items():
             for instance in relations:
                 instance = instance.__class__.remote.get_or_create_from_instance(instance)
                 getattr(self, field).add(instance)
@@ -673,7 +673,7 @@ class TagManager(InstagramSearchManager):
 
 
 class Tag(InstagramBaseModel):
-    refresh_pk = 'name'
+    _refresh_pk = 'name'
     name = models.CharField(max_length=50, unique=True)
     media_count = models.PositiveIntegerField(null=True)
 
