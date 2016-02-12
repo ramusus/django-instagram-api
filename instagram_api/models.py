@@ -307,34 +307,39 @@ class UserManager(InstagramSearchManager):
         raise ValueError("No users found for the name %s" % slug)
 
     def fetch_followers(self, user):
-        followers = self.get_followers(user)
-        followers = self.create_followers(user, followers)
-        return followers
+        users = self.get_related_users('followers', user)
+        return self.create_users_relations(user, 'followers', users)
 
-    def get_followers(self, user):
-        instances, _next = self.api_call('followers', user.pk)
+    def fetch_follows(self, user):
+        users = self.get_related_users('follows', user)
+        return self.create_users_relations(user, 'follows', users)
+
+    def get_related_users(self, method, user):
+        instances, _next = self.api_call(method, user.pk)
         while _next:
-            instances_new, _next = self.api_call('followers', with_next_url=_next)
+            instances_new, _next = self.api_call(method, with_next_url=_next)
             [instances.append(i) for i in instances_new]
         return instances
 
     @atomic
-    def create_followers(self, user, instances):
+    def create_users_relations(self, user, m2m_relation_name, instances):
+        m2m_relation = getattr(user, m2m_relation_name)
+
         followers = []
         for instance in instances:
             instance = self.parse_response_object(instance, {'fetched': timezone.now()})
             instance = self.get_or_create_from_instance(instance)
             followers.append(instance)
 
-        initial = user.followers.versions.count() == 0
+        initial = m2m_relation.versions.count() == 0
 
-        user.followers = followers
+        setattr(user, m2m_relation_name, followers)
 
         if initial:
-            user.followers.get_query_set_through().update(time_from=None)
-            user.followers.versions.update(added_count=0)
+            m2m_relation.get_query_set_through().update(time_from=None)
+            m2m_relation.versions.update(added_count=0)
 
-        return user.followers.all()
+        return m2m_relation.all()
 
     def fetch_media_likes(self, media):
         # TODO: get all likes
@@ -371,7 +376,7 @@ class User(InstagramBaseModel):
     follows_count = models.PositiveIntegerField(null=True)
     media_count = models.PositiveIntegerField(null=True)
 
-    followers = ManyToManyHistoryField('User', versions=True)
+    followers = ManyToManyHistoryField('User', versions=True, related_name='follows')
 
     is_private = models.NullBooleanField('Account is private')
 
@@ -379,6 +384,7 @@ class User(InstagramBaseModel):
     remote = UserManager(methods={
         'get': 'user',
         'search': 'user_search',
+        'follows': 'user_follows',
         'followers': 'user_followed_by',
         'likes': 'media_likes',
     })
@@ -440,6 +446,9 @@ class User(InstagramBaseModel):
             self._response['media_count'] = count.get('media', 0)
 
         super(User, self).parse()
+
+    def fetch_follows(self):
+        return User.remote.fetch_follows(user=self)
 
     def fetch_followers(self):
         return User.remote.fetch_followers(user=self)

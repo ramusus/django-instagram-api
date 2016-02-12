@@ -77,16 +77,24 @@ class UserTest(TestCase):
         u = User.objects.get(id=u.id)
         self.assertGreater(u.followers_count, 0)
 
+    def test_fetch_user_follows(self):
+        with override_api_context('instagram', token=TOKEN):
+            u = User.remote.fetch(USER_ID_3)
+            users = u.fetch_follows()
+
+        self.assertGreaterEqual(u.follows_count, 970)
+        self.assertEqual(u.follows_count, users.count())
+
     def test_fetch_user_followers(self):
         with override_api_context('instagram', token=TOKEN):
             u = User.remote.fetch(USER_ID_3)
-            followers = u.fetch_followers()
+            users = u.fetch_followers()
 
-        self.assertGreaterEqual(u.followers_count, 600)
-        self.assertEqual(u.followers_count, followers.count())
+        self.assertGreaterEqual(u.followers_count, 750)
+        self.assertEqual(u.followers_count, users.count())
 
         # check counts for follower
-        f = followers[0]
+        f = users[0]
         self.assertIsNone(f.followers_count)
         self.assertIsNone(f.follows_count)
         self.assertIsNone(f.media_count)
