@@ -365,12 +365,12 @@ class UserManager(InstagramSearchManager):
 
 class User(InstagramBaseModel):
     id = models.BigIntegerField(primary_key=True)
-    username = models.CharField(max_length=50, unique=True)
-    full_name = models.CharField(max_length=255)
-    bio = models.CharField("BIO", max_length=255)
+    username = models.CharField(max_length=30, unique=True)
+    full_name = models.CharField(max_length=30)
+    bio = models.CharField(max_length=150)
 
-    profile_picture = models.URLField(max_length=300)
-    website = models.URLField(max_length=300)
+    profile_picture = models.URLField(max_length=112)
+    website = models.URLField(max_length=150)  # found max_length=106
 
     followers_count = models.PositiveIntegerField(null=True)
     follows_count = models.PositiveIntegerField(null=True)
@@ -407,6 +407,12 @@ class User(InstagramBaseModel):
                 setattr(self, field_name, getattr(old_instance, field_name))
 
     def save(self, *args, **kwargs):
+
+        # cut all CharFields to max allowed length
+        for field in self._meta.local_fields:
+            if isinstance(field, models.CharField):
+                setattr(self, field.name, getattr(self, field.name)[:field.max_length])
+
         try:
             with atomic():
                 super(InstagramModel, self).save(*args, **kwargs)
@@ -535,20 +541,20 @@ class MediaManager(InstagramManager):
 
 
 class Media(InstagramBaseModel):
-    remote_id = models.CharField(max_length=100, unique=True)
+    remote_id = models.CharField(max_length=30, unique=True)
     caption = models.TextField(blank=True)
-    link = models.URLField(max_length=300)
+    link = models.URLField(max_length=68)
 
-    type = models.CharField(max_length=20)
-    filter = models.CharField(max_length=40)
+    type = models.CharField(max_length=5)
+    filter = models.CharField(max_length=40)  # TODO: tune max_length of this field
 
     image_low_resolution = models.URLField(max_length=200)
     image_standard_resolution = models.URLField(max_length=200)
     image_thumbnail = models.URLField(max_length=200)
 
-    video_low_bandwidth = models.URLField(max_length=200)
-    video_low_resolution = models.URLField(max_length=200)
-    video_standard_resolution = models.URLField(max_length=200)
+    video_low_bandwidth = models.URLField(max_length=130)
+    video_low_resolution = models.URLField(max_length=130)
+    video_standard_resolution = models.URLField(max_length=130)
 
     created_time = models.DateTimeField()
 
