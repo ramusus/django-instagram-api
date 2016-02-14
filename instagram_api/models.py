@@ -372,13 +372,13 @@ class User(InstagramBaseModel):
     profile_picture = models.URLField(max_length=112)
     website = models.URLField(max_length=150)  # found max_length=106
 
-    followers_count = models.PositiveIntegerField(null=True)
-    follows_count = models.PositiveIntegerField(null=True)
-    media_count = models.PositiveIntegerField(null=True)
+    followers_count = models.PositiveIntegerField(null=True, db_index=True)
+    follows_count = models.PositiveIntegerField(null=True, db_index=True)
+    media_count = models.PositiveIntegerField(null=True, db_index=True)
 
     followers = ManyToManyHistoryField('User', versions=True, related_name='follows')
 
-    is_private = models.NullBooleanField('Account is private')
+    is_private = models.NullBooleanField('Account is private', db_index=True)
 
     objects = models.Manager()
     remote = UserManager(methods={

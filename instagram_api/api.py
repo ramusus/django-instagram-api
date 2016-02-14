@@ -36,6 +36,13 @@ class InstagramApi(ApiAbstractBase):
     def get_api_response(self, *args, **kwargs):
         return getattr(self.api, self.method)(*args, **kwargs)
 
+    def handle_error_code_400(self, e, *args, **kwargs):
+        # OAuthAccessTokenException-The access_token provided is invalid.
+        if e.error_type == 'OAuthAccessTokenException':
+            self.used_access_tokens += [self.api.access_token]
+            return self.repeat_call(*args, **kwargs)
+        raise e
+
     def handle_error_code_429(self, e, *args, **kwargs):
         # Rate limited-Your client is making too many request per second
         return self.handle_rate_limit_error(e, *args, **kwargs)
