@@ -609,8 +609,8 @@ class Media(InstagramBaseModel):
         elif isinstance(self._response['caption'], dict):
             self._response['caption'] = self._response['caption']['text']
 
-        if 'likes' in self._response:
-            self._response['likes_users'] = self._response.pop('likes')
+        # if 'likes' in self._response:
+        #     self._response['likes_users'] = self._response.pop('likes')
 
         super(Media, self).parse()
 
