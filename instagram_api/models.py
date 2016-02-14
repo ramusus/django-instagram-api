@@ -303,7 +303,7 @@ class UserManager(InstagramSearchManager):
         users = self.search(slug)
         for user in users:
             if user.username == slug:
-                return self.get(user.pk)
+                return self.get(user.id)
         raise ValueError("No users found for the name %s" % slug)
 
     def fetch_followers(self, user):
