@@ -169,8 +169,10 @@ class UserTest(TestCase):
             user = User.remote.fetch(USER_PRIVATE_ID)
 
         self.assertEqual(userf, user)
-        self.assertFalse(userf.is_private)
         self.assertTrue(user.is_private)
+        self.assertFalse(userf.is_private)
+        self.assertTrue(userf.check_if_private())
+        self.assertTrue(userf.is_private)
 
     def test_unexisted_user(self):
         with override_api_context('instagram', token=TOKEN):

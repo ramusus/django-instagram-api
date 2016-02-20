@@ -2,10 +2,9 @@ import logging
 from time import sleep
 
 from django.conf import settings
-from social_api.api import ApiAbstractBase, Singleton
-from instagram.client import InstagramAPI
 from instagram import InstagramAPIError as InstagramError
-
+from instagram.client import InstagramAPI
+from social_api.api import ApiAbstractBase, Singleton
 
 __all__ = ['get_api', ]
 
@@ -24,14 +23,20 @@ InstagramError.code = code
 
 
 class InstagramApi(ApiAbstractBase):
-
     __metaclass__ = Singleton
 
     provider = 'instagram'
     error_class = InstagramError
 
     def get_api(self, token):
-        return InstagramAPI(access_token=self.get_token(), client_secret=CLIENT_SECRET)
+
+        context = getattr(settings, 'SOCIAL_API_CALL_CONTEXT', None)
+        if context and self.provider in context and context[self.provider].get('use_client_id', False) is True:
+            kwargs = {'client_id': CLIENT_ID}
+        else:
+            kwargs = {'access_token': token, 'client_secret': CLIENT_SECRET}
+
+        return InstagramAPI(**kwargs)
 
     def get_api_response(self, *args, **kwargs):
         return getattr(self.api, self.method)(*args, **kwargs)

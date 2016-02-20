@@ -11,6 +11,7 @@ from django.utils import timezone
 from instagram.helper import timestamp_to_datetime
 from instagram.models import ApiModel
 from m2m_history.fields import ManyToManyHistoryField
+from social_api.utils import override_api_context
 
 try:
     from django.db.models.related import RelatedObject as ForeignObjectRel
@@ -179,10 +180,10 @@ class InstagramModel(models.Model):
 
             if isinstance(field, ForeignObjectRel) and value:
                 self._relations_post_save['fk'][key] = [field.model.remote.parse_response_object(item)
-                                                       for item in value]
+                                                        for item in value]
             elif isinstance(field, models.ManyToManyField) and value:
                 self._relations_post_save['m2m'][key] = [field.rel.to.remote.parse_response_object(item)
-                                                        for item in value]
+                                                         for item in value]
             else:
                 if isinstance(field, models.BooleanField):
                     value = bool(value)
@@ -461,6 +462,11 @@ class User(InstagramBaseModel):
 
     def fetch_media(self, **kwargs):
         return Media.remote.fetch_user_media(user=self, **kwargs)
+
+    def check_if_private(self):
+        with override_api_context('instagram', use_client_id=True):
+            self.refresh()
+        return self.is_private
 
 
 class MediaManager(InstagramManager):
