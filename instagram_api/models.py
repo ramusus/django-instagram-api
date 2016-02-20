@@ -463,10 +463,10 @@ class User(InstagramBaseModel):
     def fetch_media(self, **kwargs):
         return Media.remote.fetch_user_media(user=self, **kwargs)
 
-    def check_if_private(self):
+    def refresh(self):
+        # do refresh via client_id, because is_private is dependent on access_token and relation with current user
         with override_api_context('instagram', use_client_id=True):
-            self.refresh()
-        return self.is_private
+            super(User, self).refresh()
 
 
 class MediaManager(InstagramManager):
