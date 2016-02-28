@@ -307,33 +307,36 @@ class UserManager(InstagramSearchManager):
         raise ValueError("No users found for the name %s" % slug)
 
     def fetch_followers(self, user):
-        users = self.get_related_users('followers', user)
-        return self.create_users_relations(user, 'followers', users)
+        return self.create_related_users('followers', user)
 
     def fetch_follows(self, user):
-        users = self.get_related_users('follows', user)
-        return self.create_users_relations(user, 'follows', users)
+        return self.create_related_users('follows', user)
 
-    def get_related_users(self, method, user):
+    def create_related_users(self, method, user):
+        user_list_attr_name = '_%s_ids' % method # user._followers_ids for example
+        setattr(user, user_list_attr_name, [])
+
+        ids = []
+        extra_fiels = {'fetched': timezone.now()}
+
         instances, _next = self.api_call(method, user.pk)
-        while _next:
-            instances_new, _next = self.api_call(method, with_next_url=_next)
-            [instances.append(i) for i in instances_new]
-        return instances
-
-    @atomic
-    def create_users_relations(self, user, m2m_relation_name, instances):
-        m2m_relation = getattr(user, m2m_relation_name)
-
-        followers = []
         for instance in instances:
-            instance = self.parse_response_object(instance, {'fetched': timezone.now()})
+            instance = self.parse_response_object(instance, extra_fiels)
             instance = self.get_or_create_from_instance(instance)
-            followers.append(instance)
+            ids += [instance.pk]
+            setattr(user, user_list_attr_name, ids)
 
+        while _next:
+            instances, _next = self.api_call(method, with_next_url=_next)
+            for instance in instances:
+                instance = self.parse_response_object(instance, extra_fiels)
+                instance = self.get_or_create_from_instance(instance)
+                ids += [instance.pk]
+                setattr(user, user_list_attr_name, ids)
+
+        m2m_relation = getattr(user, method)
         initial = m2m_relation.versions.count() == 0
-
-        setattr(user, m2m_relation_name, followers)
+        setattr(user, method, ids) # user.followers = ids
 
         if initial:
             m2m_relation.get_query_set_through().update(time_from=None)
@@ -364,6 +367,10 @@ class UserManager(InstagramSearchManager):
 
 
 class User(InstagramBaseModel):
+
+    _followers_ids = []
+    _follows_ids = []
+
     id = models.BigIntegerField(primary_key=True)
     username = models.CharField(max_length=30, unique=True)
     full_name = models.CharField(max_length=30)
