@@ -8,8 +8,8 @@ from social_api.api import ApiAbstractBase, Singleton
 
 __all__ = ['get_api', ]
 
-CLIENT_ID = getattr(settings, 'OAUTH_TOKENS_INSTAGRAM_CLIENT_ID')
-CLIENT_SECRET = getattr(settings, 'OAUTH_TOKENS_INSTAGRAM_CLIENT_SECRET')
+CLIENT_ID = getattr(settings, 'SOCIAL_API_INSTAGRAM_CLIENT_ID')
+CLIENT_SECRET = getattr(settings, 'SOCIAL_API_INSTAGRAM_CLIENT_SECRET')
 
 log = logging.getLogger('instagram_api')
 

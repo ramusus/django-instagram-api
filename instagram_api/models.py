@@ -3,6 +3,8 @@ from datetime import datetime
 import logging
 import re
 import time
+import sys
+import six
 
 from django.db import models
 from django.db.models.fields import FieldDoesNotExist
@@ -37,7 +39,6 @@ class InstagramManager(models.Manager):
     """
     Instagram Manager for RESTful CRUD operations
     """
-
     def __init__(self, methods=None, remote_pk=None, *args, **kwargs):
         if methods and len(methods.items()) < 1:
             raise ValueError('Argument methods must contains at least 1 specified method')
@@ -141,6 +142,7 @@ class InstagramModel(models.Model):
         # different lists for saving related objects
         self._relations_post_save = {'fk': {}, 'm2m': {}}
         self._relations_pre_save = []
+        self._response = {}
 
     def _substitute(self, old_instance):
         """
@@ -158,11 +160,25 @@ class InstagramModel(models.Model):
             setattr(self, field, instance)
         self._relations_pre_save = []
 
+        # cut all CharFields to max allowed length
+        for field in self._meta.local_fields:
+            if isinstance(field, (models.CharField, models.TextField)):
+                value = getattr(self, field.name)
+                if isinstance(value, six.string_types):
+                    # check strings for bad symbols in string encoding
+                    # there is problems to save users with bad encoded strings
+                    try:
+                        value.encode('utf-16').decode('utf-16')
+                    except UnicodeDecodeError:
+                        value = ''
+                if isinstance(field, models.CharField) and value:
+                    value = value[:field.max_length]
+                setattr(self, field.name, value)
+
         try:
             super(InstagramModel, self).save(*args, **kwargs)
         except Exception as e:
-            import sys
-            raise type(e), type(e)(e.message + ' while saving %s' % self.__dict__), sys.exc_info()[2]
+            six.reraise(type(e), '%s while saving %s' % (str(e), self.__dict__), sys.exc_info()[2])
 
     def parse(self):
         """
@@ -314,26 +330,21 @@ class UserManager(InstagramSearchManager):
         return self.create_related_users('follows', user)
 
     def create_related_users(self, method, user):
-        user_list_attr_name = '_%s_ids' % method # user._followers_ids for example
-        setattr(user, user_list_attr_name, [])
-
         ids = []
         extra_fiels = {'fetched': timezone.now()}
 
-        instances, _next = self.api_call(method, user.pk)
-        for instance in instances:
-            instance = self.parse_response_object(instance, extra_fiels)
-            instance = self.get_or_create_from_instance(instance)
-            ids += [instance.pk]
-            setattr(user, user_list_attr_name, ids)
-
+        _next = True
         while _next:
-            instances, _next = self.api_call(method, with_next_url=_next)
+            kwargs = {} if _next is True else {'with_next_url': _next}
+            instances, _next = self.api_call(method, user.pk, **kwargs)
             for instance in instances:
                 instance = self.parse_response_object(instance, extra_fiels)
-                instance = self.get_or_create_from_instance(instance)
-                ids += [instance.pk]
-                setattr(user, user_list_attr_name, ids)
+                try:
+                    with atomic():
+                        self.get_or_create_from_instance(instance)
+                except IntegrityError:
+                    pass
+                ids += [instance.id]
 
         m2m_relation = getattr(user, method)
         initial = m2m_relation.versions.count() == 0
@@ -415,11 +426,6 @@ class User(InstagramBaseModel):
                 setattr(self, field_name, getattr(old_instance, field_name))
 
     def save(self, *args, **kwargs):
-
-        # cut all CharFields to max allowed length
-        for field in self._meta.local_fields:
-            if isinstance(field, models.CharField):
-                setattr(self, field.name, getattr(self, field.name)[:field.max_length])
 
         try:
             with atomic():
@@ -544,7 +550,7 @@ class MediaManager(InstagramManager):
             extra_fields['user_id'] = instance.user.id
             extra_fields['location_id'] = location.pk
             instance = self.parse_response_object(instance, extra_fields)
-            instance = self.get_or_create_from_instance(instance)
+            self.get_or_create_from_instance(instance)
 
         if count is None:
             location.media_count = location.media_feed.count()
