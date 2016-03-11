@@ -337,7 +337,7 @@ class UserManager(InstagramSearchManager):
         setattr(user, m2m_relation_name, followers)
 
         if initial:
-            m2m_relation.get_query_set_through().update(time_from=None)
+            m2m_relation.get_queryset_through().update(time_from=None)
             m2m_relation.versions.update(added_count=0)
 
         return m2m_relation.all()
