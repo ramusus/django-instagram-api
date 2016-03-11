@@ -429,7 +429,7 @@ class User(InstagramBaseModel):
 
         try:
             with atomic():
-                super(InstagramModel, self).save(*args, **kwargs)
+                super(InstagramBaseModel, self).save(*args, **kwargs)
         except IntegrityError as e:
             if 'username' in e.message:
                 # duplicate key value violates unique constraint "instagram_api_user_username_key"
