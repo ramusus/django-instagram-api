@@ -130,18 +130,57 @@ class InstagramManager(models.Manager):
 
 
 class InstagramModel(models.Model):
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        # cut all CharFields to max allowed length
+        cut = False
+        for field in self._meta.local_fields:
+            if isinstance(field, (models.CharField, models.TextField)):
+                value = getattr(self, field.name)
+                if isinstance(field, models.CharField) and value:
+                    if len(value) > field.max_length:
+                        value = value[:field.max_length]
+                        cut = True
+                if isinstance(value, six.string_types):
+                    # check strings for bad symbols in string encoding
+                    # there is problems to save users with bad encoded strings
+                    while True:
+                        try:
+                            value.encode('utf-16').decode('utf-16')
+                            break
+                        except UnicodeDecodeError:
+                            if cut and len(value) > 2:
+                                value = value[:-1]
+                            else:
+                                value = ''
+                                break
+                setattr(self, field.name, value)
+
+        try:
+            super(InstagramModel, self).save(*args, **kwargs)
+        except Exception as e:
+            six.reraise(type(e), '%s while saving %s' % (str(e), self.__dict__), sys.exc_info()[2])
+
+
+class InstagramBaseModel(InstagramModel):
     _refresh_pk = 'id'
+
+    fetched = models.DateTimeField(u'Fetched', null=True, blank=True)
     objects = models.Manager()
 
     class Meta:
         abstract = True
 
     def __init__(self, *args, **kwargs):
-        super(InstagramModel, self).__init__(*args, **kwargs)
+        super(InstagramBaseModel, self).__init__(*args, **kwargs)
 
         # different lists for saving related objects
         self._relations_post_save = {'fk': {}, 'm2m': {}}
         self._relations_pre_save = []
+        self._tweepy_model = None
         self._response = {}
 
     def _substitute(self, old_instance):
@@ -160,23 +199,8 @@ class InstagramModel(models.Model):
             setattr(self, field, instance)
         self._relations_pre_save = []
 
-        # cut all CharFields to max allowed length
-        for field in self._meta.local_fields:
-            if isinstance(field, (models.CharField, models.TextField)):
-                value = getattr(self, field.name)
-                if isinstance(value, six.string_types):
-                    # check strings for bad symbols in string encoding
-                    # there is problems to save users with bad encoded strings
-                    try:
-                        value.encode('utf-16').decode('utf-16')
-                    except UnicodeDecodeError:
-                        value = ''
-                if isinstance(field, models.CharField) and value:
-                    value = value[:field.max_length]
-                setattr(self, field.name, value)
-
         try:
-            super(InstagramModel, self).save(*args, **kwargs)
+            super(InstagramBaseModel, self).save(*args, **kwargs)
         except Exception as e:
             six.reraise(type(e), '%s while saving %s' % (str(e), self.__dict__), sys.exc_info()[2])
 
@@ -223,25 +247,15 @@ class InstagramModel(models.Model):
 
                 setattr(self, key, value)
 
+    def get_url(self):
+        return 'https://instagram.com/%s' % self.slug
+
     def refresh(self):
         """
         Refresh current model with remote data
         """
         instance = self.__class__.remote.fetch(getattr(self, self._refresh_pk))
         self.__dict__.update(instance.__dict__)
-
-
-class InstagramBaseModel(InstagramModel):
-    _tweepy_model = None
-    _response = None
-
-    fetched = models.DateTimeField(u'Fetched', null=True, blank=True)
-
-    class Meta:
-        abstract = True
-
-    def get_url(self):
-        return 'https://instagram.com/%s' % self.slug
 
 
 class InstagramSearchManager(InstagramManager):
@@ -454,7 +468,7 @@ class User(InstagramBaseModel):
                         user_local.delete()
                     else:
                         raise
-                super(InstagramModel, self).save(*args, **kwargs)
+                super(InstagramBaseModel, self).save(*args, **kwargs)
             else:
                 raise
 

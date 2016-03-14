@@ -98,7 +98,7 @@ class UserTest(InstagramApiTestCase):
         users = u.fetch_follows()
 
         self.assertGreaterEqual(u.follows_count, 970)
-        self.assertEqual(u.follows_count, users.count() + 1)
+        self.assertEqual(u.follows_count, users.count())
 
     def test_fetch_user_followers(self):
         u = User.remote.fetch(USER_ID_3)
@@ -126,6 +126,12 @@ class UserTest(InstagramApiTestCase):
         self.assertIsNotNone(f.followers_count)
         self.assertIsNotNone(f.follows_count)
         self.assertIsNotNone(f.media_count)
+
+    def test_fetch_users_with_full_name_overlength(self):
+        user = User.remote.fetch(47274770)
+        self.assertEqual(user.full_name, u'Stas from Ishim Ишим Тюмень Ty')
+        user = User.remote.fetch(2057367004)
+        self.assertEqual(user.full_name, u'Кератин, Ботокс в Краснодаре ')
 
     def test_fetch_duplicate_user(self):
 
@@ -280,7 +286,7 @@ class MediaTest(InstagramApiTestCase):
 
         media = u.fetch_media(after=after)
 
-        self.assertEqual(media.count(), 52)  # not 50 for some strange reason
+        self.assertEqual(media.count(), 53)  # not 50 for some strange reason
         self.assertEqual(media.count(), u.media_feed.count())
 
     def test_fetch_media_with_location(self):
