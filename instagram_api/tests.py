@@ -53,12 +53,6 @@ class UserTest(InstagramApiTestCase):
         self.assertGreater(len(u.profile_picture), 0)
         self.assertGreater(len(u.website), 0)
 
-    def test_fetch_bad_string(self):
-
-        u = User.remote.get_by_slug('beautypageantsfans')
-        self.assertEqual(u.full_name,
-                         u'I Am A Girl \xbfAnd What?\ud83d\udc81\ud83c\udffb\u2728\ud83d\udc51\ud83d\udc8b')
-
     def test_search_users(self):
 
         users = User.remote.search('tnt_online')
@@ -126,11 +120,21 @@ class UserTest(InstagramApiTestCase):
         self.assertIsNotNone(f.follows_count)
         self.assertIsNotNone(f.media_count)
 
-    def test_fetch_users_with_full_name_overlength(self):
+    def test_fetch_users_with_full_name_bad_overlength(self):
+        user = User.remote.get_by_slug('stasplot')
+        self.assertEqual(user.full_name, u'Stas from Ishim Ишим Тюмень Tymen region Тюмень')  # noqa
         user = User.remote.fetch(47274770)
         self.assertEqual(user.full_name, u'Stas from Ishim Ишим Тюмень Ty')
+
+        user = User.remote.get_by_slug('keratin_krasnodar1')
+        self.assertEqual(user.full_name, u'Кератин, Ботокс в Краснодаре \ud83c\udf80')  # noqa
         user = User.remote.fetch(2057367004)
         self.assertEqual(user.full_name, u'Кератин, Ботокс в Краснодаре ')
+
+        user = User.remote.get_by_slug('beautypageantsfans')
+        self.assertEqual(user.full_name, u'I Am A Girl \xbfAnd What?\ud83d\udc81\ud83c\udffb\u2728\ud83d\udc51\ud83d\udc8b')  # noqa
+        user = User.remote.fetch(1164190771)
+        self.assertEqual(user.full_name, u'I Am A Girl \xbfAnd What?\ud83d\udc81\ud83c\udffb\u2728\ud83d\udc51')
 
     def test_fetch_duplicate_user(self):
 
