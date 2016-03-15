@@ -171,7 +171,7 @@ class UserTest(InstagramApiTestCase):
         UserFactory(id=2116301016)
         User.remote.fetch(2116301016)
 
-        with self.assertRaisesWithCode(InstagramError):
+        with self.assertRaises(InstagramError):
             User.remote.get(1206219929)
 
         try:
@@ -181,7 +181,7 @@ class UserTest(InstagramApiTestCase):
 
     def test_fetch_private_user(self):
 
-        with self.assertRaisesWithCode(InstagramError):
+        with self.assertRaises(InstagramError):
             User.remote.fetch(USER_PRIVATE_ID)
 
         try:
@@ -200,7 +200,7 @@ class UserTest(InstagramApiTestCase):
         self.assertTrue(userf.is_private)
 
     def test_unexisted_user(self):
-        with self.assertRaisesWithCode(InstagramError):
+        with self.assertRaises(InstagramError):
             User.remote.get(0)
 
         try:
