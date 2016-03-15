@@ -4,7 +4,6 @@ from datetime import datetime
 from django.test import TestCase
 from django.conf import settings
 from django.utils import timezone
-from unittest.case import _sentinel, _AssertRaisesContext
 
 from .factories import UserFactory, LocationFactory
 from .models import Media, User, Tag, Location
@@ -22,7 +21,7 @@ TAG_NAME = "snowyday"
 TAG_SEARCH_NAME = "snowy"
 LOCATION_SEARCH_NAME = "Dog Patch Labs"
 
-TOKEN = '1687258424.fac34ad.34a30c3152014c41abde0da40740077c'
+TOKEN = '1762199780.0fdde74.0008ee5d43e04f5ebea16ba62136bc69'
 
 
 class InstagramApiTestCase(TestCase):
@@ -172,13 +171,23 @@ class UserTest(InstagramApiTestCase):
         UserFactory(id=2116301016)
         User.remote.fetch(2116301016)
 
-        with self.assertRaisesWithCode(InstagramError, 400):
+        with self.assertRaisesWithCode(InstagramError):
             User.remote.get(1206219929)
+
+        try:
+            User.remote.get(1206219929)
+        except InstagramError as e:
+            self.assertEqual(e.code, 400)
 
     def test_fetch_private_user(self):
 
-        with self.assertRaisesWithCode(InstagramError, 400):
+        with self.assertRaisesWithCode(InstagramError):
             User.remote.fetch(USER_PRIVATE_ID)
+
+        try:
+            User.remote.fetch(USER_PRIVATE_ID)
+        except InstagramError as e:
+            self.assertEqual(e.code, 400)
 
         userf = UserFactory(id=USER_PRIVATE_ID)
         user = User.remote.fetch(USER_PRIVATE_ID)
@@ -191,20 +200,13 @@ class UserTest(InstagramApiTestCase):
         self.assertTrue(userf.is_private)
 
     def test_unexisted_user(self):
-        with self.assertRaisesWithCode(InstagramError, 400):
+        with self.assertRaisesWithCode(InstagramError):
             User.remote.get(0)
 
-    def assertRaisesWithCode(self, excClass, code, callableObj=_sentinel, *args, **kwargs):
-        context = _AssertRaisesContext(excClass, self)
-        if callableObj is _sentinel:
-            return context
-        with context:
-            callableObj(*args, **kwargs)
-
         try:
-            callableObj(*args, **kwargs)
-        except excClass as e:
-            self.assertEqual(e.code, code)
+            User.remote.get(0)
+        except InstagramError as e:
+            self.assertEqual(e.code, 400)
 
 
 class MediaTest(InstagramApiTestCase):
