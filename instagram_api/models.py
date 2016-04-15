@@ -9,7 +9,6 @@ import six
 from django.db import models
 from django.db.models.fields import FieldDoesNotExist
 from django.db.utils import IntegrityError
-from django.conf import settings
 from django.utils import timezone
 from instagram.helper import timestamp_to_datetime
 from instagram.models import ApiModel
@@ -25,12 +24,6 @@ try:
 except ImportError:
     # django 1.8 +
     from django.db.models.fields.related import ForeignObjectRel
-
-if 'field_history' in settings.INSTALLED_APPS:
-    from field_history.tracker import FieldHistoryTracker
-    using_field_history = True
-else:
-    using_field_history = False
 
 __all__ = ['User', 'Media', 'Comment', 'InstagramContentError', 'InstagramModel', 'InstagramManager', 'UserManager'
            'Tag', 'TagManager']
@@ -428,9 +421,6 @@ class User(InstagramBaseModel):
         'followers': 'user_followed_by',
         'likes': 'media_likes',
     })
-
-    if using_field_history:
-        field_history = FieldHistoryTracker(['followers_count', 'follows_count', 'media_count'])
 
     @property
     def slug(self):
