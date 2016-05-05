@@ -2,7 +2,7 @@ import logging
 from time import sleep
 
 from django.conf import settings
-from instagram import InstagramAPIError as InstagramError
+from instagram import InstagramAPIError as InstagramError, InstagramClientError
 from instagram.client import InstagramAPI
 from social_api.api import ApiAbstractBase, Singleton
 
@@ -26,7 +26,7 @@ class InstagramApi(ApiAbstractBase):
     __metaclass__ = Singleton
 
     provider = 'instagram'
-    error_class = InstagramError
+    error_class = (InstagramError, InstagramClientError)
 
     def get_api(self, token):
 
