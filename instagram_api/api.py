@@ -54,14 +54,14 @@ class InstagramApi(ApiAbstractBase):
 
     def handle_error_code_500(self, e, *args, **kwargs):
         # InstagramClientError: (500) Unable to parse response, not valid JSON.
-        return self.repeat_call(*args, **kwargs)
+        return self.sleep_repeat_call(*args, **kwargs)
 
     def handle_error_code_502(self, e, *args, **kwargs):
         # InstagramClientError: (502) Unable to parse response, not valid JSON.
-        return self.repeat_call(*args, **kwargs)
+        return self.sleep_repeat_call(*args, **kwargs)
 
     def handle_error_code_503(self, e, *args, **kwargs):
-        return self.repeat_call(*args, **kwargs)
+        return self.sleep_repeat_call(*args, **kwargs)
 
     def handle_rate_limit_error(self, e, *args, **kwargs):
         self.used_access_tokens += [self.api.access_token]
@@ -69,7 +69,7 @@ class InstagramApi(ApiAbstractBase):
             log.warning("All access tokens are rate limited, need to wait 600 sec")
             sleep(600)
             self.used_access_tokens = []
-        return self.repeat_call(*args, **kwargs)
+        return self.sleep_repeat_call(*args, **kwargs)
 
 
 def api_call(*args, **kwargs):
