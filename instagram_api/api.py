@@ -56,6 +56,10 @@ class InstagramApi(ApiAbstractBase):
         # InstagramClientError: (500) Unable to parse response, not valid JSON.
         return self.repeat_call(*args, **kwargs)
 
+    def handle_error_code_502(self, e, *args, **kwargs):
+        # InstagramClientError: (502) Unable to parse response, not valid JSON.
+        return self.repeat_call(*args, **kwargs)
+
     def handle_error_code_503(self, e, *args, **kwargs):
         return self.repeat_call(*args, **kwargs)
 
