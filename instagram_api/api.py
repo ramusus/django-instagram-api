@@ -52,6 +52,10 @@ class InstagramApi(ApiAbstractBase):
         # Rate limited-Your client is making too many request per second
         return self.handle_rate_limit_error(e, *args, **kwargs)
 
+    def handle_error_code_500(self, e, *args, **kwargs):
+        # InstagramClientError: (500) Unable to parse response, not valid JSON.
+        return self.repeat_call(*args, **kwargs)
+
     def handle_error_code_503(self, e, *args, **kwargs):
         return self.repeat_call(*args, **kwargs)
 
