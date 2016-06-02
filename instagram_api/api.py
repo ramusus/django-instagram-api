@@ -43,7 +43,7 @@ class InstagramApi(ApiAbstractBase):
 
     def handle_error_code_400(self, e, *args, **kwargs):
         # OAuthAccessTokenException-The access_token provided is invalid.
-        if e.error_type == 'OAuthAccessTokenException':
+        if e.error_type in ['OAuthAccessTokenException', 'OAuthPermissionsException']:
             self.used_access_tokens += [self.api.access_token]
             return self.repeat_call(*args, **kwargs)
         raise e
