@@ -592,8 +592,8 @@ class Media(InstagramBaseModel):
 
     created_time = models.DateTimeField()
 
-    comments_count = models.PositiveIntegerField(null=True)
-    likes_count = models.PositiveIntegerField(null=True)
+    comments_count = models.PositiveIntegerField(null=True, default=0)
+    likes_count = models.PositiveIntegerField(null=True, default=0)
 
     user = models.ForeignKey('User', related_name="media_feed")
     location = models.ForeignKey('Location', null=True, related_name="media_feed")
