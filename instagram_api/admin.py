@@ -17,6 +17,7 @@ class UserAdmin(AllFieldsReadOnly):
     instagram_link.allow_tags = True
 
     list_display = ['id', 'full_name', 'instagram_link']
+    list_filter = ('is_private',)
     search_fields = ('username', 'full_name')
 
     exclude = ('followers',)

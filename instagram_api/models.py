@@ -218,34 +218,35 @@ class InstagramBaseModel(InstagramModel):
                 log.debug('Field with name "%s" doesn\'t exist in the model %s' % (key, type(self)))
                 continue
 
-            if isinstance(field, ForeignObjectRel) and value:
-                self._relations_post_save['fk'][key] = [field.model.remote.parse_response_object(item)
-                                                        for item in value]
-            elif isinstance(field, models.ManyToManyField) and value:
-                self._relations_post_save['m2m'][key] = [field.rel.to.remote.parse_response_object(item)
-                                                         for item in value]
-            else:
-                if isinstance(field, models.BooleanField):
-                    value = bool(value)
+            if value:
+                if isinstance(field, ForeignObjectRel):
+                    self._relations_post_save['fk'][key] = [field.model.remote.parse_response_object(item)
+                                                            for item in value]
+                elif isinstance(field, models.ManyToManyField):
+                    self._relations_post_save['m2m'][key] = [field.rel.to.remote.parse_response_object(item)
+                                                             for item in value]
+                else:
+                    if isinstance(field, models.BooleanField):
+                        value = bool(value)
 
-                elif isinstance(field, (models.OneToOneField, models.ForeignKey)) and value:
-                    rel_instance = field.rel.to.remote.parse_response_object(value)
-                    value = rel_instance
-                    if isinstance(field, models.ForeignKey):
-                        self._relations_pre_save += [(key, rel_instance)]
+                    elif isinstance(field, (models.OneToOneField, models.ForeignKey)) and value:
+                        rel_instance = field.rel.to.remote.parse_response_object(value)
+                        value = rel_instance
+                        if isinstance(field, models.ForeignKey):
+                            self._relations_pre_save += [(key, rel_instance)]
 
-                elif isinstance(field, (fields.CommaSeparatedCharField,
-                                        models.CommaSeparatedIntegerField)) and isinstance(value, list):
-                    value = ','.join([unicode(v) for v in value])
+                    elif isinstance(field, (fields.CommaSeparatedCharField,
+                                            models.CommaSeparatedIntegerField)) and isinstance(value, list):
+                        value = ','.join([unicode(v) for v in value])
 
-                elif isinstance(field, (models.CharField, models.TextField)) and value:
-                    if isinstance(value, (str, unicode)):
-                        value = value.strip()
+                    elif isinstance(field, (models.CharField, models.TextField)) and value:
+                        if isinstance(value, (str, unicode)):
+                            value = value.strip()
 
-                elif isinstance(field, models.IntegerField) and value:
-                    value = int(value)
+                    elif isinstance(field, models.IntegerField) and value:
+                        value = int(value)
 
-                setattr(self, key, value)
+                    setattr(self, key, value)
 
     def get_url(self):
         return 'https://instagram.com/%s' % self.slug
@@ -362,7 +363,7 @@ class UserManager(InstagramSearchManager):
 
         m2m_relation = getattr(user, method)
         initial = m2m_relation.versions.count() == 0
-        setattr(user, method, ids) # user.followers = ids
+        setattr(user, method, ids)  # user.followers = ids
 
         if initial:
             m2m_relation.get_queryset_through().update(time_from=None)

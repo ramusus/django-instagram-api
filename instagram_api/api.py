@@ -29,7 +29,6 @@ class InstagramApi(ApiAbstractBase):
     error_class = (InstagramError, InstagramClientError)
 
     def get_api(self, token):
-
         context = getattr(settings, 'SOCIAL_API_CALL_CONTEXT', None)
         if context and self.provider in context and context[self.provider].get('use_client_id', False) is True:
             kwargs = {'client_id': CLIENT_ID}

@@ -21,7 +21,7 @@ TAG_NAME = "snowyday"
 TAG_SEARCH_NAME = "snowy"
 LOCATION_SEARCH_NAME = "Dog Patch Labs"
 
-TOKEN = '1762199780.0fdde74.0008ee5d43e04f5ebea16ba62136bc69'
+TOKEN = '1687258424.0fdde74.9badafabca4e49df90da02798db6bf02'
 
 
 class InstagramApiTestCase(TestCase):
@@ -88,6 +88,7 @@ class UserTest(InstagramApiTestCase):
 
     def test_fetch_user_follows(self):
         u = User.remote.fetch(USER_ID_3)
+        self.assertEqual(u.is_private, False)
         users = u.fetch_follows()
 
         self.assertGreaterEqual(u.follows_count, 970)
@@ -95,6 +96,7 @@ class UserTest(InstagramApiTestCase):
 
     def test_fetch_user_followers(self):
         u = User.remote.fetch(USER_ID_3)
+        self.assertEqual(u.is_private, False)
         users = u.fetch_followers()
 
         self.assertGreaterEqual(u.followers_count, 750)
