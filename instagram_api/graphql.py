@@ -1,4 +1,3 @@
-import re
 import simplejson as json
 from oauth_tokens.providers.instagram import InstagramAuthRequest
 
@@ -11,10 +10,9 @@ class GraphQL(object):
         req = InstagramAuthRequest()
         url = 'https://www.instagram.com/%s/' % user.username
         response = req.authorized_request('get', url=url)
-        csrf_token = re.findall(r'"csrf_token": "([^"]+)"}', response.content)[0]
         headers = {
             'Referer': url,
-            'X-CSRFToken': csrf_token,
+            'X-CSRFToken': req.get_csrf_token_from_content(response.content),
         }
 
         user_id = user.id
