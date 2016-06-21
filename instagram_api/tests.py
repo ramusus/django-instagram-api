@@ -22,6 +22,8 @@ TAG_SEARCH_NAME = "snowy"
 LOCATION_SEARCH_NAME = "Dog Patch Labs"
 
 TOKEN = '1687258424.0fdde74.9badafabca4e49df90da02798db6bf02'
+INSTAGRAM_USERNAME = 'atsepk'
+INSTAGRAM_PASSWORD = 'Jh6#dFwEHc'
 
 
 class InstagramApiTestCase(TestCase):
@@ -89,7 +91,12 @@ class UserTest(InstagramApiTestCase):
     def test_fetch_user_follows_graphql(self):
         u = User.remote.fetch(USER_ID_3)
         self.assertEqual(u.is_private, False)
-        users = u.fetch_follows(source='graphql')
+
+        settings_temp = dict(OAUTH_TOKENS_INSTAGRAM_USERNAME=INSTAGRAM_USERNAME,
+                             OAUTH_TOKENS_INSTAGRAM_PASSWORD=INSTAGRAM_PASSWORD)
+
+        with self.settings(**settings_temp):
+            users = u.fetch_follows(source='graphql')
 
         self.assertGreaterEqual(u.follows_count, 996)
         self.assertEqual(u.follows_count, users.count())
@@ -98,7 +105,12 @@ class UserTest(InstagramApiTestCase):
     def test_fetch_user_followers_graphql(self):
         u = User.remote.fetch(USER_ID_3)
         self.assertEqual(u.is_private, False)
-        users = u.fetch_followers(source='graphql')
+
+        settings_temp = dict(OAUTH_TOKENS_INSTAGRAM_USERNAME=INSTAGRAM_USERNAME,
+                             OAUTH_TOKENS_INSTAGRAM_PASSWORD=INSTAGRAM_PASSWORD)
+
+        with self.settings(**settings_temp):
+            users = u.fetch_followers(source='graphql')
 
         self.assertGreaterEqual(u.follows_count, 754)
         self.assertEqual(u.followers_count, users.count())
