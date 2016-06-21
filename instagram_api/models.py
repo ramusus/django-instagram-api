@@ -51,6 +51,12 @@ class InstagramManager(models.Manager):
 
         super(InstagramManager, self).__init__(*args, **kwargs)
 
+    def bulk_create_from_instances(self, instances):
+        ids = [instance.id for instance in instances]
+        ids_exists = self.model.objects.filter(id__in=ids).values_list('id', flat=True)
+        instances = [instance for instance in instances if instance.id not in ids_exists]
+        self.model.objects.bulk_create(instances)
+
     def get_or_create_from_instance(self, instance):
 
         remote_pk_dict = {}
@@ -369,15 +375,13 @@ class UserManager(InstagramSearchManager):
         _next = True
         while _next:
             kwargs = {} if _next is True else {'with_next_url': _next}
+            users = []
             instances, _next = self.api_call(method, user.pk, **kwargs)
             for instance in instances:
                 instance = self.parse_response_object(instance, extra_fiels)
-                try:
-                    with atomic():
-                        self.get_or_create_from_instance(instance)
-                except IntegrityError:
-                    pass
+                users += [instance]
                 ids += [instance.id]
+            self.bulk_create_from_instances(users)
         return ids
 
     def create_related_users_graphql(self, method, user):
@@ -385,11 +389,13 @@ class UserManager(InstagramSearchManager):
         ids = []
         extra_fiels = {'fetched': timezone.now()}
         for resources in graphql.related_users(method, user):
+            users = []
             for instance in resources:
                 instance['profile_picture'] = instance['profile_pic_url']
                 instance = self.parse_response_object(instance, extra_fiels)
-                self.get_or_create_from_instance(instance)
+                users += [instance]
                 ids += [instance.id]
+            self.bulk_create_from_instances(users)
         return ids
 
     def fetch_media_likes(self, media):
