@@ -86,6 +86,24 @@ class UserTest(InstagramApiTestCase):
         u = User.objects.get(id=u.id)
         self.assertGreater(u.followers_count, 0)
 
+    def test_fetch_user_follows_graphql(self):
+        u = User.remote.fetch(USER_ID_3)
+        self.assertEqual(u.is_private, False)
+        users = u.fetch_follows(source='graphql')
+
+        self.assertGreaterEqual(u.follows_count, 996)
+        self.assertEqual(u.follows_count, users.count())
+        self.assertEqual(u.follows_count, User.objects.count() - 1)
+
+    def test_fetch_user_followers_graphql(self):
+        u = User.remote.fetch(USER_ID_3)
+        self.assertEqual(u.is_private, False)
+        users = u.fetch_followers(source='graphql')
+
+        self.assertGreaterEqual(u.follows_count, 754)
+        self.assertEqual(u.followers_count, users.count())
+        self.assertEqual(u.followers_count, User.objects.count() - 1)
+
     def test_fetch_user_follows(self):
         u = User.remote.fetch(USER_ID_3)
         self.assertEqual(u.is_private, False)

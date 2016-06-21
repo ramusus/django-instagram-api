@@ -18,6 +18,7 @@ from social_api.utils import override_api_context
 from . import fields
 from .api import api_call, InstagramError
 from .decorators import atomic
+from .graphql import GraphQL
 
 try:
     from django.db.models.related import RelatedObject as ForeignObjectRel
@@ -338,13 +339,30 @@ class UserManager(InstagramSearchManager):
                 return self.get(user.id)
         raise ValueError("No users found for the name %s" % slug)
 
-    def fetch_followers(self, user):
-        return self.create_related_users('followers', user)
+    def fetch_followers(self, user, **kwargs):
+        return self.create_related_users('followed_by', user, **kwargs)
 
-    def fetch_follows(self, user):
-        return self.create_related_users('follows', user)
+    def fetch_follows(self, user, **kwargs):
+        return self.create_related_users('follows', user, **kwargs)
 
-    def create_related_users(self, method, user):
+    def create_related_users(self, method, user, **kwargs):
+        if kwargs.pop('source') == 'graphql':
+            ids = self.create_related_users_graphql(method, user)
+        else:
+            ids = self.create_related_users_api(method, user)
+
+        method = method.replace('followed_by', 'followers')
+        m2m_relation = getattr(user, method)
+        initial = m2m_relation.versions.count() == 0
+        setattr(user, method, ids)  # user.followers = ids
+
+        if initial:
+            m2m_relation.get_queryset_through().update(time_from=None)
+            m2m_relation.versions.update(added_count=0)
+
+        return m2m_relation.all()
+
+    def create_related_users_api(self, method, user):
         ids = []
         extra_fiels = {'fetched': timezone.now()}
 
@@ -360,16 +378,19 @@ class UserManager(InstagramSearchManager):
                 except IntegrityError:
                     pass
                 ids += [instance.id]
+        return ids
 
-        m2m_relation = getattr(user, method)
-        initial = m2m_relation.versions.count() == 0
-        setattr(user, method, ids)  # user.followers = ids
-
-        if initial:
-            m2m_relation.get_queryset_through().update(time_from=None)
-            m2m_relation.versions.update(added_count=0)
-
-        return m2m_relation.all()
+    def create_related_users_graphql(self, method, user):
+        graphql = GraphQL()
+        ids = []
+        extra_fiels = {'fetched': timezone.now()}
+        for resources in graphql.related_users(method, user):
+            for instance in resources:
+                instance['profile_picture'] = instance['profile_pic_url']
+                instance = self.parse_response_object(instance, extra_fiels)
+                self.get_or_create_from_instance(instance)
+                ids += [instance.id]
+        return ids
 
     def fetch_media_likes(self, media):
         # TODO: get all likes
@@ -419,7 +440,7 @@ class User(InstagramBaseModel):
         'get': 'user',
         'search': 'user_search',
         'follows': 'user_follows',
-        'followers': 'user_followed_by',
+        'followed_by': 'user_followed_by',
         'likes': 'media_likes',
     })
 
@@ -482,11 +503,11 @@ class User(InstagramBaseModel):
 
         super(User, self).parse()
 
-    def fetch_follows(self):
-        return User.remote.fetch_follows(user=self)
+    def fetch_follows(self, **kwargs):
+        return User.remote.fetch_follows(user=self, **kwargs)
 
-    def fetch_followers(self):
-        return User.remote.fetch_followers(user=self)
+    def fetch_followers(self, **kwargs):
+        return User.remote.fetch_followers(user=self, **kwargs)
 
     def fetch_media(self, **kwargs):
         return Media.remote.fetch_user_media(user=self, **kwargs)
