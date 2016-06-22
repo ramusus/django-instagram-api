@@ -1,4 +1,5 @@
 import requests
+import time
 import simplejson as json
 from oauth_tokens.providers.instagram import InstagramAuthRequest
 
@@ -28,7 +29,6 @@ class GraphQL(object):
         next_page = True
 
         while next_page:
-
             graphql = '''
 ig_user(%(user_id)s) {
     %(endpoint)s.%(method)s(%(args)s) {
@@ -41,8 +41,16 @@ ig_user(%(user_id)s) {
             response = session.post(url=self.url, data={'q': graphql}, headers=headers)
             json_response = json.loads(response.content)
 
+            if json_response['status'] == 'fail' \
+                    and json_response['message'] == 'Sorry, too many requests. Please try again later.':
+                time.sleep(1)
+                continue
+
             method = 'after'
-            args = '%s, %s' % (json_response[endpoint]['page_info']['end_cursor'], limit)
-            next_page = json_response[endpoint]['page_info']['has_next_page']
-            # print json_response[endpoint]['count'], len(json_response[endpoint]['nodes']), next_page
-            yield json_response[endpoint]['nodes']
+            try:
+                args = '%s, %s' % (json_response[endpoint]['page_info']['end_cursor'], limit)
+                next_page = json_response[endpoint]['page_info']['has_next_page']
+                # print json_response[endpoint]['count'], len(json_response[endpoint]['nodes']), next_page
+                yield json_response[endpoint]['nodes']
+            except KeyError:
+                raise Exception('Unexpected response: "%s" of graphql request: "%s"' % (json_response, graphql))

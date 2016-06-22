@@ -426,7 +426,7 @@ class User(InstagramBaseModel):
     _follows_ids = []
 
     id = models.BigIntegerField(primary_key=True)
-    username = models.CharField(max_length=30, unique=True)
+    username = models.CharField(max_length=30, db_index=True)
     full_name = models.CharField(max_length=30)
     bio = models.CharField(max_length=150)
 
