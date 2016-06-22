@@ -1,3 +1,4 @@
+import requests
 import simplejson as json
 from oauth_tokens.providers.instagram import InstagramAuthRequest
 
@@ -9,13 +10,15 @@ class GraphQL(object):
 
     def related_users(self, endpoint, user):
         req = InstagramAuthRequest()
+        session = requests.Session()
         url = 'https://www.instagram.com/%s/' % user.username
-        response = req.authorized_request('get', url=url)
+        # response = req.authorized_request('get', url=url)
+        response = session.get(url=url)
         csrf_token = req.get_csrf_token_from_content(response.content)
         headers = {
             'Referer': url,
             'X-CSRFToken': csrf_token,
-            'Cookies': self.cookies.replace('CSRF_TOKEN', csrf_token),
+            'Cookie': self.cookies.replace('CSRF_TOKEN', csrf_token),
         }
 
         user_id = user.id
@@ -34,7 +37,8 @@ ig_user(%(user_id)s) {
     }
 }''' % locals()
 
-            response = req.authorized_request('post', url=self.url, data={'q': graphql}, headers=headers)
+            # response = req.authorized_request('post', url=self.url, data={'q': graphql}, headers=headers)
+            response = session.post(url=self.url, data={'q': graphql}, headers=headers)
             json_response = json.loads(response.content)
 
             method = 'after'
