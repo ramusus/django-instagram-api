@@ -426,8 +426,8 @@ class User(InstagramBaseModel):
     _follows_ids = []
 
     id = models.BigIntegerField(primary_key=True)
-    username = models.CharField(max_length=30, db_index=True)
-    full_name = models.CharField(max_length=30)
+    username = models.CharField(max_length=50, db_index=True)  # max_length=30 in interface
+    full_name = models.CharField(max_length=80)  # max_length=30 in interface
     bio = models.CharField(max_length=150)
 
     profile_picture = models.URLField(max_length=112)
@@ -780,5 +780,6 @@ class Location(InstagramBaseModel):
 
     def parse(self):
         super(Location, self).parse()
-        self.latitude = self._response['point'].latitude
-        self.longitude = self._response['point'].longitude
+        if self._response['point']:
+            self.latitude = self._response['point'].latitude
+            self.longitude = self._response['point'].longitude
