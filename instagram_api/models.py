@@ -293,7 +293,7 @@ class UserManager(InstagramSearchManager):
         kwargs['extra_fields']['is_private'] = False
         try:
             return super(UserManager, self).get(*args, **kwargs)
-        except InstagramError, e:
+        except InstagramError as e:
             if e.code == 400:
                 if e.error_type == 'APINotAllowedError':
                     # {'error_message': 'you cannot view this resource',
