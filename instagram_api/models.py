@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
+import calendar
 import logging
 import re
 import time
@@ -654,6 +655,8 @@ class Media(InstagramBaseModel):
 
         if not isinstance(self._response['created_time'], datetime):
             self._response['created_time'] = timestamp_to_datetime(self._response['created_time'])
+
+        self._response['created_time'] = datetime.fromtimestamp(calendar.timegm(self._response['created_time'].timetuple()))
 
         if 'comment_count' in self._response:
             self._response['comments_count'] = self._response.pop('comment_count')

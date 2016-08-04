@@ -264,6 +264,9 @@ class MediaTest(InstagramApiTestCase):
         self.assertGreater(m.fetched, self.time)
         self.assertIsInstance(m.created_time, datetime)
 
+        # specifying timezone and then making it naive again
+        self.assertEqual(m.created_time, timezone.make_aware(m.created_time, timezone.get_current_timezone()).replace(tzinfo=None))
+
         self.assertEqual(m.type, 'video')
         self.assertEqual(m.filter, 'Normal')
 
